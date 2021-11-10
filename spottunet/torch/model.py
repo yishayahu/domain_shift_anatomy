@@ -16,7 +16,7 @@ from spottunet.torch.functional import gumbel_softmax
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2', 'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0', 'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0', 'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
 prev_step = -1
-bar = tqdm(range(100))
+bar = tqdm(range(6000))
 def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
                alpha_l2sp=None, reference_architecture=None,train_step_logger=None, **optimizer_params):
     bar.update()
@@ -61,12 +61,12 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
             if 'out_path.4' in n1 or 'out_path.3.layer.bias' in n1:
                 continue
             if 'bn' in n1:
-                dist_pet_layer_bn.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2))))
+                dist_pet_layer_bn.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2.cpu()))))
                 param_size_per_layer_bn.append(float(torch.mean(torch.abs(p1))))
                 normalize_dist_per_layer_bn.append(dist_pet_layer[-1]/param_size_per_layer[-1])
                 names_bn.append(n1)
             else:
-                dist_pet_layer.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2))))
+                dist_pet_layer.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2.cpu()))))
                 param_size_per_layer.append(float(torch.mean(torch.abs(p1))))
                 normalize_dist_per_layer.append(dist_pet_layer[-1]/param_size_per_layer[-1])
                 names.append(n1)
@@ -90,9 +90,11 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         return dmap(to_np, loss)
     if type(loss) == dict:
         optimizer_step(optimizer, loss['total_loss'], **optimizer_params)
+        loss = {k:float(v) for (k,v) in loss.items()}
     else:
         optimizer_step(optimizer, loss, **optimizer_params)
-    return to_np(loss)
+        loss = to_np(loss)
+    return loss
 
 
 def train_step_spottune(*inputs: np.ndarray, architecture_main, architecture_policy, k_reg, reg_mode, temperature,

@@ -98,7 +98,7 @@ val_metrics = {'dice_score': partial(aggregate_metric_probably_with_ids, metric=
 
 n_filters = 16
 architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=n_chans_out, n_filters_init=n_filters)
-
+architecture.to(device)
 
 @slicewise  # 3D -> 2D iteratively
 @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
@@ -204,7 +204,7 @@ run_experiment = run(
     preload_model_fn(architecture=architecture, baseline_exp_path=baseline_exp_path,
                      n_folds=len(dataset.df.fold.unique())),
     freeze_func(architecture),
-    architecture.to(device),
+
     if_missing(lambda p: [train_model(), save_model_state(architecture, p)], saved_model_path),
     load_model_state(architecture, saved_model_path),
     if_missing(predict_to_dir, output_path=test_predictions_path),
