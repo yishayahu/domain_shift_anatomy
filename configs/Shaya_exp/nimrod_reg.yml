@@ -1,0 +1,5 @@
+EXP_NAME: "nimrod_reg"
+EXP_DIR: "/home/dsi/shaya/dart_results/nimrod_reg/experiment_0/"
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+CRITERION: FineRegularizedLoss

@@ -1,0 +1,5 @@
+EXP_NAME: "only_test"
+EXP_DIR: '/home/dsi/shaya/dart_results/only_test/experiment_0/'
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 0
+  x: 4

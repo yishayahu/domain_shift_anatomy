@@ -1,0 +1,4 @@
+EXP_NAME: "posttrain_ts_48"
+EXP_DIR: "/home/dsi/shaya/dart_results/posttrain_ts_48/experiment_0/"
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60

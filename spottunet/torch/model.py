@@ -1,18 +1,25 @@
 from typing import Callable
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import wandb
 from torch.nn import Module
 from torch.optim import Optimizer
 
 from dpipe.im.utils import identity, dmap
 from dpipe.torch.utils import *
 from dpipe.torch.model import *
+from tqdm import tqdm
+
 from spottunet.torch.functional import gumbel_softmax
 
-
+layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2', 'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0', 'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0', 'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
+prev_step = -1
+bar = tqdm(range(100))
 def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None, reference_architecture=None, **optimizer_params):
+               alpha_l2sp=None, reference_architecture=None,train_step_logger=None, **optimizer_params):
+    bar.update()
     architecture.train()
     if n_targets >= 0:
         n_inputs = len(inputs) - n_targets
@@ -35,12 +42,56 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         loss = criterion(architecture(*inputs), *targets) + alpha_l2sp * w_diff
     else:
         loss = criterion(architecture(*inputs), *targets)
+    global prev_step
+    if train_step_logger is not None and train_step_logger._experiment.step > prev_step:
+        print('vizviz')
+        prev_step = train_step_logger._experiment.step
+        if reference_architecture is None:
+            raise ValueError('`reference_architecture` should be provided for wandb')
+        dist_pet_layer = []
+        param_size_per_layer = []
+        normalize_dist_per_layer = []
+        dist_pet_layer_bn = []
+        param_size_per_layer_bn = []
+        normalize_dist_per_layer_bn = []
+        names = []
+        names_bn = []
+        for (n1,p1), (n2,p2) in zip(architecture.named_parameters(), reference_architecture.named_parameters()):
+            assert n1 == n2
+            if 'out_path.4' in n1 or 'out_path.3.layer.bias' in n1:
+                continue
+            if 'bn' in n1:
+                dist_pet_layer_bn.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2))))
+                param_size_per_layer_bn.append(float(torch.mean(torch.abs(p1))))
+                normalize_dist_per_layer_bn.append(dist_pet_layer[-1]/param_size_per_layer[-1])
+                names_bn.append(n1)
+            else:
+                dist_pet_layer.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2))))
+                param_size_per_layer.append(float(torch.mean(torch.abs(p1))))
+                normalize_dist_per_layer.append(dist_pet_layer[-1]/param_size_per_layer[-1])
+                names.append(n1)
+
+        for k,v in {'dist':dist_pet_layer,'param_size':param_size_per_layer,'relative_dist':normalize_dist_per_layer,'dist_bn':dist_pet_layer_bn,'param_size_bn':param_size_per_layer_bn,'relative_dist_bn':normalize_dist_per_layer_bn}.items():
+            im_path = f'{train_step_logger._experiment.name}_{k}.png'
+            if 'bn' in k:
+                curr_names = names_bn
+            else:
+                curr_names = names
+            print(f'max for {k} is in layer {curr_names[np.argmax(v)]} and its values is {np.max(v)}')
+
+            plt.plot(list(range(len(v))),v)
+            plt.savefig(im_path)
+            wandb.log({f'{k}':wandb.Image(im_path)},step=train_step_logger._experiment.step)
+            plt.cla()
+            plt.clf()
 
     if loss_key is not None:
         optimizer_step(optimizer, loss[loss_key], **optimizer_params)
         return dmap(to_np, loss)
-
-    optimizer_step(optimizer, loss, **optimizer_params)
+    if type(loss) == dict:
+        optimizer_step(optimizer, loss['total_loss'], **optimizer_params)
+    else:
+        optimizer_step(optimizer, loss, **optimizer_params)
     return to_np(loss)
 
 

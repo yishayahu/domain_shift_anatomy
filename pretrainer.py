@@ -1,28 +1,20 @@
-import argparse
-import os
-import shutil
-
 import dpipe.commands as commands
 import numpy as np
 import torch
 
 from functools import partial
-
-import yaml
 from dpipe.config import if_missing, lock_dir, run
 from dpipe.layout import Flat
 from dpipe.train import train, Checkpoints, Policy
-from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
+from dpipe.train.logging import WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
-
-from spottunet.torch.losses import FineRegularizedLoss
 from spottunet.torch.model import train_step
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
 from spottunet.metric import evaluate_individual_metrics_probably_with_ids, compute_metrics_probably_with_ids, aggregate_metric_probably_with_ids, evaluate_individual_metrics_probably_with_ids_no_pred
-from spottunet.split import one2one
+from spottunet.split import one2all
 from dpipe.dataset.wrappers import apply, cache_methods
 from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri
-from spottunet.paths import DATA_PATH, BASELINE_PATH
+from spottunet.paths import DATA_PATH
 from dpipe.im.metrics import dice_score
 from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch
 from dpipe.predict import add_extract_dims, divisible_shape
@@ -31,39 +23,12 @@ from dpipe.train.policy import Schedule
 from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
-from spottunet.torch.utils import load_model_state_fold_wise, freeze_model,none_func
 
-class Config:
-    def __init__(self, raw):
-        for k,v in raw.items():
-            if v in globals():
-                v = globals()[v]
-            setattr(self,k,v)
-
-cli = argparse.ArgumentParser()
-cli.add_argument("--exp_name", default='debug')
-cli.add_argument("--device", default='cpu')
-opts = cli.parse_args()
-cfg = Config(yaml.safe_load(open(f"configs/Shaya_exp/{opts.exp_name}.yml", "r")))
-assert opts.exp_name == cfg.EXP_NAME
-device = opts.device if torch.cuda.is_available() else 'cpu'
-if device == 'cpu':
-    Warning('running on cpu')
-exp_dir = cfg.EXP_DIR
-freeze_func = cfg.FREEZE_FUNC
-n_epochs = cfg.NUM_EPOCHS
-criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
-
-shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
-shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
-
-print(f'running {cfg.EXP_NAME}')
-log_path = os.path.join(exp_dir,'train_logs')
-saved_model_path = os.path.join(exp_dir,'model.pth')
-test_predictions_path = os.path.join(exp_dir,'test_predictions')
-test_metrics_path = os.path.join(exp_dir,'test_metrics')
-checkpoints_path = os.path.join(exp_dir,'checkpoints')
-
+print('first')
+log_path = 'train_logs'
+saved_model_path = 'model2.pth'
+test_predictions_path = 'test_predictions'
+checkpoints_path = 'checkpoints'
 
 data_path = DATA_PATH
 
@@ -71,19 +36,19 @@ voxel_spacing = (1, 0.95, 0.95)
 
 preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
 dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
-val_size = 2
-n_add_ids = 1  # 1, 2, 3
-pretrained = True
-
+val_size = 4
 seed = 0xBadCafe
-n_first_exclude = 0
-n_exps = 30
-split = one2one(dataset.df, val_size=val_size, n_add_ids=n_add_ids,
-                train_on_add_only=pretrained, seed=seed)[n_first_exclude:n_exps]
+n_experiments = len(dataset.df.fold.unique())
+
+split = one2all(
+    df=dataset.df,
+    val_size=val_size,
+    seed=seed
+)[:n_experiments]
 layout = Flat(split)
-train_ids = layout.get_ids('train',folder=exp_dir)
-test_ids = layout.get_ids('test',folder=exp_dir)
-val_ids = layout.get_ids('val',folder=exp_dir)
+train_ids = layout.get_ids('train',folder='/home/dsi/shaya/dart_results/one_to_all/experiment_2/')
+test_ids = layout.get_ids('test',folder='/home/dsi/shaya/dart_results/one_to_all/experiment_2/')
+val_ids = layout.get_ids('val',folder='/home/dsi/shaya/dart_results/one_to_all/experiment_2/')
 
 n_chans_in = 1
 n_chans_out = 1
@@ -115,12 +80,13 @@ load_y = dataset.load_segm
 validate_step = partial(compute_metrics_probably_with_ids, predict=val_predict,
                         load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics)
 
-logger = WANDBLogger(project='spot2',dir=exp_dir,entity=None)
-
+# logger = WANDBLogger(project='spot',dir=)
+logger = None # todo: fix
 alpha_l2sp = None
-
+reference_architecture = None
 lr_init = 1e-3
-lr = Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, })
+lr = Schedule(initial=lr_init, epoch2value_multiplier={80: 0.1, })
+
 optimizer = torch.optim.SGD(
     architecture.parameters(),
     lr=lr_init,
@@ -129,20 +95,10 @@ optimizer = torch.optim.SGD(
     weight_decay=0
 )
 
+criterion = weighted_cross_entropy_with_logits
 
-# if type(logger) == WANDBLogger:
-#     logger._experiment.watch(architecture,criterion,log='all',log_graph=False,log_freq=1)
-
-
-preload_model_fn = load_model_state_fold_wise
-baseline_exp_path = BASELINE_PATH
-reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=n_chans_out, n_filters_init=n_filters)
-preload_model_fn(architecture=reference_architecture, baseline_exp_path=baseline_exp_path,
-                 n_folds=len(dataset.df.fold.unique()))
-if 'nimrod_reg' == cfg.EXP_NAME:
-    criterion = criterion(architecture,reference_architecture)
 train_kwargs = dict(lr=lr, architecture=architecture, optimizer=optimizer, criterion=criterion,
-                    alpha_l2sp=alpha_l2sp, reference_architecture=reference_architecture,train_step_logger=logger)
+                    alpha_l2sp=alpha_l2sp, reference_architecture=reference_architecture)
 
 checkpoints = Checkpoints(checkpoints_path, {
     **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
@@ -150,7 +106,8 @@ checkpoints = Checkpoints(checkpoints_path, {
 })
 
 ids_sampling_weights = None
-slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48
+slice_sampling_interval = 1
+
 
 def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
     sp_dims_2d = (-2, -1)
@@ -163,6 +120,13 @@ x_patch_size = y_patch_size = np.array([256, 256])
 batch_size = 16
 
 batches_per_epoch = 100
+
+device = 'cuda:7'
+fix_seed(seed=seed),
+lock_dir(),
+architecture.to(device),
+
+
 batch_iter = Infinite(
     load_by_random_id(dataset.load_image, dataset.load_segm, ids=train_ids,
                       weights=ids_sampling_weights, random_state=seed),
@@ -172,7 +136,8 @@ batch_iter = Infinite(
     multiply(np.float32),
     batch_size=batch_size, batches_per_epoch=batches_per_epoch
 )
-
+n_epochs = 100
+print('start training')
 train_model = partial(train,
     train_step=train_step,
     batch_iter=batch_iter,
@@ -182,7 +147,8 @@ train_model = partial(train,
     validate=validate_step,
     **train_kwargs
 )
-
+if_missing(lambda p: [train_model, save_model_state(architecture, p)], saved_model_path),
+load_model_state(architecture, saved_model_path),
 predict_to_dir = skip_predict
 
 final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
@@ -193,21 +159,6 @@ evaluate_individual_metrics = partial(
     predict=predict,
     metrics=final_metrics,
     test_ids=test_ids,
-    logger=logger
 )
-
-
-
-run_experiment = run(
-    fix_seed(seed=0xBAAAAAAD),
-    lock_dir(exp_dir),
-    preload_model_fn(architecture=architecture, baseline_exp_path=baseline_exp_path,
-                     n_folds=len(dataset.df.fold.unique())),
-    freeze_func(architecture),
-    architecture.to(device),
-    if_missing(lambda p: [train_model(), save_model_state(architecture, p)], saved_model_path),
-    load_model_state(architecture, saved_model_path),
-    if_missing(predict_to_dir, output_path=test_predictions_path),
-    if_missing(evaluate_individual_metrics, results_path=test_metrics_path),
-)
-debugging_mode = False
+if_missing(predict_to_dir, output_path=test_predictions_path),
+if_missing(evaluate_individual_metrics, results_path='test_metrics'),
