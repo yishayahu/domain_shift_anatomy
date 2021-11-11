@@ -23,11 +23,19 @@ class FineRegularizedLoss:
             if 'shortcut' in n1:
                 continue
             else:
-                temp_loss = torch.sum(((p1 - p2) ** 2)) ** 0.5
+                temp_loss = torch.sum(((p1.data - p2.data) ** 2)) ** 0.5
                 cur_weight = torch.tensor(self.max_weight) - self.beta * torch.log(torch.tensor(float(amount_of_params-i), requires_grad=True)).to(temp_loss.device)
                 custom_loss+=cur_weight * temp_loss
 
         losses_dict['reg_loss'] = custom_loss
-        losses_dict['total_loss'] = custom_loss+loss
+        if custom_loss == 0:
+            print('eeee')
+            losses_dict['total_loss'] = loss
+        else:
+            losses_dict['total_loss'] = custom_loss+loss
+        t = ''
+        for k,v in losses_dict.items():
+            t+= f'{k}_{v}'
+        print('losses',t)
 
         return losses_dict
