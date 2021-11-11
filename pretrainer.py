@@ -1,3 +1,5 @@
+import os
+
 import dpipe.commands as commands
 import numpy as np
 import torch
@@ -6,7 +8,7 @@ from functools import partial
 from dpipe.config import if_missing, lock_dir, run
 from dpipe.layout import Flat
 from dpipe.train import train, Checkpoints, Policy
-from dpipe.train.logging import WANDBLogger
+from dpipe.train.logging import WANDBLogger, ConsoleLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
 from spottunet.torch.model import train_step
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
@@ -23,12 +25,13 @@ from dpipe.train.policy import Schedule
 from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
-
-print('first')
-log_path = 'train_logs'
-saved_model_path = 'model2.pth'
-test_predictions_path = 'test_predictions'
-checkpoints_path = 'checkpoints'
+exp_dir = "/home/dsi/shaya/dart_results/posttrain_ts_48/experiment_0/" #todo: change it to the directory
+device = 'cuda:7' # todo: change to available device (can be chaecked using nvidia-smi)
+log_path = os.path.join(exp_dir,'train_logs')
+saved_model_path = os.path.join(exp_dir,'model.pth')
+test_predictions_path = os.path.join(exp_dir,'test_predictions')
+test_metrics_path = os.path.join(exp_dir,'test_metrics')
+checkpoints_path = os.path.join(exp_dir,'checkpoints')
 
 data_path = DATA_PATH
 
@@ -46,9 +49,9 @@ split = one2all(
     seed=seed
 )[:n_experiments]
 layout = Flat(split)
-train_ids = layout.get_ids('train',folder='/home/dsi/shaya/dart_results/one_to_all/experiment_2/')
-test_ids = layout.get_ids('test',folder='/home/dsi/shaya/dart_results/one_to_all/experiment_2/')
-val_ids = layout.get_ids('val',folder='/home/dsi/shaya/dart_results/one_to_all/experiment_2/')
+train_ids = layout.get_ids('train',folder=exp_dir)
+test_ids = layout.get_ids('test',folder=exp_dir)
+val_ids = layout.get_ids('val',folder=exp_dir)
 
 n_chans_in = 1
 n_chans_out = 1
@@ -80,8 +83,8 @@ load_y = dataset.load_segm
 validate_step = partial(compute_metrics_probably_with_ids, predict=val_predict,
                         load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics)
 
-# logger = WANDBLogger(project='spot',dir=)
-logger = None # todo: fix
+
+logger = ConsoleLogger() #todo: can be changed to wandb logger
 alpha_l2sp = None
 reference_architecture = None
 lr_init = 1e-3
@@ -121,9 +124,9 @@ batch_size = 16
 
 batches_per_epoch = 100
 
-device = 'cuda:7'
+
 fix_seed(seed=seed),
-lock_dir(),
+lock_dir(exp_dir),
 architecture.to(device),
 
 
@@ -147,7 +150,7 @@ train_model = partial(train,
     validate=validate_step,
     **train_kwargs
 )
-if_missing(lambda p: [train_model, save_model_state(architecture, p)], saved_model_path),
+if_missing(lambda p: [train_model(), save_model_state(architecture, p)], saved_model_path),
 load_model_state(architecture, saved_model_path),
 predict_to_dir = skip_predict
 
@@ -161,4 +164,4 @@ evaluate_individual_metrics = partial(
     test_ids=test_ids,
 )
 if_missing(predict_to_dir, output_path=test_predictions_path),
-if_missing(evaluate_individual_metrics, results_path='test_metrics'),
+if_missing(evaluate_individual_metrics, results_path=test_metrics_path),

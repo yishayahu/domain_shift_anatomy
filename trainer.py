@@ -56,6 +56,9 @@ criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
 shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
+shutil.rmtree(os.path.join(exp_dir,'test_metrics'),ignore_errors=True)
+shutil.rmtree(os.path.join(exp_dir,'test_predictions'),ignore_errors=True)
+shutil.rmtree(os.path.join(exp_dir,'model.pth'),ignore_errors=True)
 
 print(f'running {cfg.EXP_NAME}')
 log_path = os.path.join(exp_dir,'train_logs')
@@ -133,7 +136,7 @@ optimizer = torch.optim.SGD(
 # if type(logger) == WANDBLogger:
 #     logger._experiment.watch(architecture,criterion,log='all',log_graph=False,log_freq=1)
 
-preload_model_fn = none_func#load_model_state_fold_wise
+preload_model_fn = load_model_state_fold_wise
 baseline_exp_path = BASELINE_PATH
 reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=n_chans_out, n_filters_init=n_filters)
 preload_model_fn(architecture=reference_architecture, baseline_exp_path=baseline_exp_path,
