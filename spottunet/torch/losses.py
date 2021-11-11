@@ -28,13 +28,12 @@ class FineRegularizedLoss:
                 i+=1
         losses_dict['reg_loss'] = custom_loss
         if custom_loss == 0:
-            print('eeee')
+
             losses_dict['total_loss'] = loss
         else:
             losses_dict['total_loss'] = custom_loss+loss
-        t = ''
-        for k,v in losses_dict.items():
-            t+= f'{k}_{v}'
-        print('losses',t)
+        if torch.any(torch.isnan(losses_dict['total_loss'])):
+            raise Exception('loss is nan')
+
 
         return losses_dict

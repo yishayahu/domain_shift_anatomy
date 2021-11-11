@@ -27,7 +27,7 @@ from dpipe.im.metrics import dice_score
 from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch
 from dpipe.predict import add_extract_dims, divisible_shape
 from spottunet.torch.module.unet import UNet2D
-from dpipe.train.policy import Schedule
+from dpipe.train.policy import Schedule, TQDM
 from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
@@ -182,6 +182,7 @@ train_model = partial(train,
     logger=logger,
     checkpoints=checkpoints,
     validate=validate_step,
+    bar=TQDM(),
     **train_kwargs
 )
 

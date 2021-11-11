@@ -16,7 +16,7 @@ class UNet2D(nn.Module):
             ResBlock2d(n, n, kernel_size=3, padding=1),
             ResBlock2d(n, n, kernel_size=3, padding=1),
         )
-        self.shortcut0 = nn.Conv2d(n, n, kernel_size=1, padding=0)
+
 
         self.down1 = nn.Sequential(
             PreActivation2d(n, n * 2, kernel_size=2, stride=2, bias=False),
@@ -24,7 +24,7 @@ class UNet2D(nn.Module):
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1),
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1)
         )
-        self.shortcut1 = nn.Conv2d(n * 2, n * 2, kernel_size=1, padding=0)
+
 
         self.down2 = nn.Sequential(
             PreActivation2d(n * 2, n * 4, kernel_size=2, stride=2, bias=False),
@@ -32,7 +32,7 @@ class UNet2D(nn.Module):
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1),
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1)
         )
-        self.shortcut2 = nn.Conv2d(n * 4, n * 4, kernel_size=1, padding=0)
+
 
         self.bottleneck = nn.Sequential(
             PreActivation2d(n * 4, n * 8, kernel_size=2, stride=2, bias=False),
@@ -41,6 +41,7 @@ class UNet2D(nn.Module):
             ResBlock2d(n * 8, n * 8, kernel_size=3, padding=1),
             nn.ConvTranspose2d(n * 8, n * 4, kernel_size=2, stride=2, bias=False),
         )
+        self.shortcut2 = nn.Conv2d(n * 4, n * 4, kernel_size=1, padding=0)
 
         self.up2 = nn.Sequential(
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1),
@@ -48,14 +49,14 @@ class UNet2D(nn.Module):
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1),
             nn.ConvTranspose2d(n * 4, n * 2, kernel_size=2, stride=2, bias=False),
         )
-
+        self.shortcut1 = nn.Conv2d(n * 2, n * 2, kernel_size=1, padding=0)
         self.up1 = nn.Sequential(
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1),
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1),
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1),
             nn.ConvTranspose2d(n * 2, n, kernel_size=2, stride=2, bias=False),
         )
-
+        self.shortcut0 = nn.Conv2d(n, n, kernel_size=1, padding=0)
         self.out_path = nn.Sequential(
             ResBlock2d(n, n, kernel_size=3, padding=1),
             ResBlock2d(n, n, kernel_size=3, padding=1),

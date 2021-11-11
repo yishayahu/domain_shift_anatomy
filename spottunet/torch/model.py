@@ -10,16 +10,14 @@ from torch.optim import Optimizer
 from dpipe.im.utils import identity, dmap
 from dpipe.torch.utils import *
 from dpipe.torch.model import *
-from tqdm import tqdm
+
 
 from spottunet.torch.functional import gumbel_softmax
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2', 'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0', 'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0', 'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
 prev_step = -1
-bar = tqdm(range(6000))
 def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
                alpha_l2sp=None, reference_architecture=None,train_step_logger=None, **optimizer_params):
-    bar.update()
     architecture.train()
     if n_targets >= 0:
         n_inputs = len(inputs) - n_targets
