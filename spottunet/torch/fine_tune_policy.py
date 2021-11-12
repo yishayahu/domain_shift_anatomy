@@ -27,7 +27,7 @@ class FineTunePolicy(Policy):
         self.grad_per_layer = torch.zeros(len(self.layers))
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
         if self.detect_plateau(metrics):
-            layer_index = torch.argmax(self.grad_per_layer)
+            layer_index = int(torch.argmax(self.grad_per_layer))
             layer_to_unfreeze_name,layer_to_unfreeze = self.layers[layer_index]
             print(f'unfreezing {layer_to_unfreeze_name}')
             self.unfreezed_layers[layer_index] = layer_to_unfreeze_name
