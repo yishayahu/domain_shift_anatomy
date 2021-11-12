@@ -15,6 +15,7 @@ from dpipe.train import train, Checkpoints, Policy
 from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
 
+from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy
 from spottunet.torch.losses import FineRegularizedLoss
 from spottunet.torch.model import train_step
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
@@ -36,7 +37,11 @@ from spottunet.torch.utils import load_model_state_fold_wise, freeze_model,none_
 class Config:
     def __init__(self, raw):
         for k,v in raw.items():
-            if v in globals():
+            if type(v) == dict:
+                curr_func = v.pop('FUNC')
+                assert curr_func in globals()
+                v = partial(globals()[curr_func],**v)
+            elif v in globals():
                 v = globals()[v]
             setattr(self,k,v)
 
@@ -52,13 +57,18 @@ if device == 'cpu':
 exp_dir = cfg.EXP_DIR
 freeze_func = cfg.FREEZE_FUNC
 n_epochs = cfg.NUM_EPOCHS
+training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
+
 criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
+
+batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
 
 shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'test_metrics'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'test_predictions'),ignore_errors=True)
-shutil.rmtree(os.path.join(exp_dir,'model.pth'),ignore_errors=True)
+if os.path.exists(os.path.join(exp_dir,'model.pth')):
+    os.remove(os.path.join(exp_dir,'model.pth'))
 
 print(f'running {cfg.EXP_NAME}')
 log_path = os.path.join(exp_dir,'train_logs')
@@ -143,8 +153,10 @@ preload_model_fn(architecture=reference_architecture, baseline_exp_path=baseline
                  n_folds=len(dataset.df.fold.unique()))
 if 'nimrod_reg' == cfg.EXP_NAME:
     criterion = criterion(architecture,reference_architecture)
+
 train_kwargs = dict(lr=lr, architecture=architecture, optimizer=optimizer, criterion=criterion,
                     alpha_l2sp=alpha_l2sp, reference_architecture=reference_architecture,train_step_logger=logger)
+
 
 checkpoints = Checkpoints(checkpoints_path, {
     **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
@@ -152,7 +164,7 @@ checkpoints = Checkpoints(checkpoints_path, {
 })
 
 ids_sampling_weights = None
-slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48
+slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48 todo: change to be configable
 
 def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
     sp_dims_2d = (-2, -1)
@@ -164,7 +176,7 @@ def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
 x_patch_size = y_patch_size = np.array([256, 256])
 batch_size = 16
 
-batches_per_epoch = 100
+
 batch_iter = Infinite(
     load_by_random_id(dataset.load_image, dataset.load_segm, ids=train_ids,
                       weights=ids_sampling_weights, random_state=seed),
@@ -174,7 +186,8 @@ batch_iter = Infinite(
     multiply(np.float32),
     batch_size=batch_size, batches_per_epoch=batches_per_epoch
 )
-
+if training_policy is not None:
+    training_policy = training_policy(architecture,optimizer)
 train_model = partial(train,
     train_step=train_step,
     batch_iter=batch_iter,
@@ -183,6 +196,7 @@ train_model = partial(train,
     checkpoints=checkpoints,
     validate=validate_step,
     bar=TQDM(),
+    training_policy=training_policy,
     **train_kwargs
 )
 

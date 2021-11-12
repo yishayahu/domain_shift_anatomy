@@ -1,0 +1,9 @@
+EXP_NAME: "policy_finetune"
+EXP_DIR: "/home/dsi/shaya/dart_results/policy_fintune/experiment_0/"
+FREEZE_FUNC:
+  FUNC: "none_func"
+  exclude_layers: []
+NUM_EPOCHS: 120
+BATCHES_PER_EPOCH: 50
+TRAINING_POLICY: "FineTunePolicy"
+

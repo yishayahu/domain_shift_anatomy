@@ -1,5 +1,6 @@
 EXP_NAME: "unfreeze_first_ts_2"
 EXP_DIR: '/home/dsi/shaya/dart_results/unfreeze_first_ts_2/experiment_0/'
-EXCLUDE_LAYERS: ['init_path.0', 'init_path.1']
-FREEZE_FUNC: "freeze_model"
+FREEZE_FUNC:
+  FUNC: "freeze_model"
+  exclude_layers: ['init_path.0', 'init_path.1']
 NUM_EPOCHS: 60
