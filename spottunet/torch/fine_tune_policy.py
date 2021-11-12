@@ -32,7 +32,7 @@ class FineTunePolicy(Policy):
     def detect_plateau(self,metrics):
         curr_metric = metrics['sdice_score']
 
-        if curr_metric < self.last_best[0] and curr_metric < self.last_best[1]:
+        if curr_metric < self.last_best[1] < self.last_best[0]:
             to_ret = True
         else:
             to_ret = False
