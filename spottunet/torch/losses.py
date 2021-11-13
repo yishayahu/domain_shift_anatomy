@@ -5,7 +5,7 @@ from torch import nn
 
 
 class FineRegularizedLoss:
-    def __init__(self, architecture, reference_architecture,base_criterion=weighted_cross_entropy_with_logits, max_weight=np.array(7).astype('float32'), beta=1.5):
+    def __init__(self, architecture, reference_architecture,base_criterion=weighted_cross_entropy_with_logits, max_weight=np.array(10).astype('float32'), beta=1.2):
         self.architecture = architecture
         self.reference_architecture = reference_architecture
         self.reference_architecture.to(next(self.architecture.parameters()).device)
@@ -16,7 +16,7 @@ class FineRegularizedLoss:
     @staticmethod
     def module_condition(module1):
         module_name, module1 = module1
-        if isinstance(module1, nn.Conv2d) or isinstance(module1, nn.ConvTranspose2d):
+        if isinstance(module1, nn.Conv2d) or isinstance(module1, nn.ConvTranspose2d) or isinstance(module1,nn.BatchNorm2d):
             if 'out_path.3' not in module_name and  'out_path.4' not in module_name:
                 return True
         return False
@@ -42,6 +42,7 @@ class FineRegularizedLoss:
                 cur_weight = torch.tensor(self.max_weight) - self.beta * torch.log(torch.tensor(float(amount_of_params-i), requires_grad=True)).to(temp_loss.device)
                 custom_loss+=cur_weight * temp_loss
                 i+=1
+        custom_loss*=10
         losses_dict['reg_loss'] = custom_loss
         if custom_loss == 0:
 
