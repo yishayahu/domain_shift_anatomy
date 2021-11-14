@@ -87,7 +87,7 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         optimizer_step(optimizer, loss[loss_key], **optimizer_params)
         return dmap(to_np, loss)
     if type(loss) == dict:
-        optimizer_step(optimizer, loss['total_loss'], **optimizer_params)
+        optimizer_step(optimizer, loss['total_loss_'], **optimizer_params)
         loss = {k:float(v) for (k,v) in loss.items()}
     else:
         optimizer_step(optimizer, loss, **optimizer_params)

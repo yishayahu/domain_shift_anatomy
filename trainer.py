@@ -52,8 +52,7 @@ opts = cli.parse_args()
 cfg = Config(yaml.safe_load(open(f"configs/Shaya_exp/{opts.exp_name}.yml", "r")))
 assert opts.exp_name == cfg.EXP_NAME
 device = opts.device if torch.cuda.is_available() else 'cpu'
-if device == 'cpu':
-    Warning('running on cpu')
+
 exp_dir = cfg.EXP_DIR
 freeze_func = cfg.FREEZE_FUNC
 n_epochs = cfg.NUM_EPOCHS
@@ -62,6 +61,13 @@ training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
 criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
 batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
+batch_size = 16
+project = 'spot2'
+if device == 'cpu':
+    Warning('running on cpu')
+    batches_per_epoch = 2
+    batch_size = 2
+    project = 'spot3'
 
 shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
@@ -128,7 +134,7 @@ load_y = dataset.load_segm
 validate_step = partial(compute_metrics_probably_with_ids, predict=val_predict,
                         load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics)
 
-logger = WANDBLogger(project='spot2',dir=exp_dir,entity=None)
+logger = WANDBLogger(project=project,dir=exp_dir,entity=None)
 
 alpha_l2sp = None
 
@@ -174,7 +180,7 @@ def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
 
 
 x_patch_size = y_patch_size = np.array([256, 256])
-batch_size = 16
+
 
 
 batch_iter = Infinite(

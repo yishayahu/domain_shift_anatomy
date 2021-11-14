@@ -46,7 +46,7 @@ class FineTunePolicy(Policy):
 
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
         if self.detect_plateau(metrics):
-            layer_index = int(torch.argmax(self.grad_per_layer[:][0]))
+            layer_index = int(torch.argmax(self.grad_per_layer[:,0]))
             layer_to_unfreeze_name = self.index_to_layer[layer_index]
             layer_to_unfreeze_list = self.layers[layer_to_unfreeze_name]
             print(f'unfreezing {layer_to_unfreeze_name}')
@@ -63,6 +63,9 @@ class FineTunePolicy(Policy):
         for layer_index in range(len(self.layers)):
             if layer_index not in self.unfreezed_layers:
                 self.grad_per_layer[layer_index][0] += self.grad_per_layer[layer_index][1] / self.grad_per_layer[layer_index][2]
+                self.grad_per_layer[layer_index][1] = 0
+                self.grad_per_layer[layer_index][2] = 0
+
 
 
     def detect_plateau(self,metrics):
@@ -82,7 +85,7 @@ class FineTunePolicy(Policy):
         def hook(_,__,grad_output):
             assert len(grad_output) ==1
             if layer_index not in self.unfreezed_layers:
-                self.grad_per_layer[layer_index][1] += torch.sum(grad_output[0].cpu())
+                self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(grad_output[0].cpu()))
                 self.grad_per_layer[layer_index][2] += grad_output[0].numel()
 
         return hook

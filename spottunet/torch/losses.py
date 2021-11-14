@@ -22,7 +22,7 @@ class FineRegularizedLoss:
         return False
     def __call__(self, outputs,targets):
         loss = weighted_cross_entropy_with_logits(outputs,targets)
-        losses_dict = {'base_loss':loss}
+        losses_dict = {'base_loss_':loss}
         custom_loss = 0.0
 
         amount_of_params = len([x for x in self.architecture.named_modules() if self.module_condition(x)])
@@ -43,13 +43,13 @@ class FineRegularizedLoss:
                 custom_loss+=cur_weight * temp_loss
                 i+=1
         custom_loss*=10
-        losses_dict['reg_loss'] = custom_loss
+        losses_dict['reg_loss_'] = custom_loss
         if custom_loss == 0:
 
-            losses_dict['total_loss'] = loss
+            losses_dict['total_loss_'] = loss
         else:
-            losses_dict['total_loss'] = custom_loss+loss
-        if torch.any(torch.isnan(losses_dict['total_loss'])):
+            losses_dict['total_loss_'] = custom_loss+loss
+        if torch.any(torch.isnan(losses_dict['total_loss_'])):
             raise Exception('loss is nan')
 
 
