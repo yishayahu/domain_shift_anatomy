@@ -128,7 +128,7 @@ load_y = dataset.load_segm
 validate_step = partial(compute_metrics_probably_with_ids, predict=val_predict,
                         load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics)
 
-logger = WANDBLogger(project='spot3',dir=exp_dir,entity=None)
+logger = WANDBLogger(project='spot2',dir=exp_dir,entity=None)
 
 alpha_l2sp = None
 
@@ -187,7 +187,7 @@ batch_iter = Infinite(
     batch_size=batch_size, batches_per_epoch=batches_per_epoch
 )
 if training_policy is not None:
-    training_policy = training_policy(architecture,optimizer)
+    training_policy = training_policy(architecture=architecture,optimizer=optimizer)
 train_model = partial(train,
     train_step=train_step,
     batch_iter=batch_iter,
