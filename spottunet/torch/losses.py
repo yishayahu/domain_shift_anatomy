@@ -30,15 +30,15 @@ class FineRegularizedLoss:
         for ((n1,p1), (n2,p2)) in zip(self.architecture.named_modules(), self.reference_architecture.named_modules()):
             assert n1 == n2
             if self.module_condition((n1,p1)):
-                weight_dist = torch.sum(p1.weight - p2.weight)
+                weight_dist = torch.sum(torch.abs((p1.weight - p2.weight)))
 
                 if p1.bias is None:
                     total_dist = weight_dist/p1.weight.numel()
 
                 else:
-                    bias_dist = torch.sum(p1.bias - p2.bias)
+                    bias_dist = torch.sum(torch.abs((p1.bias - p2.bias)))
                     total_dist = (weight_dist + bias_dist)/ (p1.weight.numel() + p1.bias.numel())
-                temp_loss = torch.sqrt(total_dist ** 2)
+                temp_loss = total_dist
                 cur_weight = torch.tensor(self.max_weight) - self.beta * torch.log(torch.tensor(float(amount_of_params-i), requires_grad=True)).to(temp_loss.device)
                 custom_loss+=cur_weight * temp_loss
                 i+=1
