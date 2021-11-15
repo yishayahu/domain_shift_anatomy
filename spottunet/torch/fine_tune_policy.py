@@ -14,17 +14,23 @@ class FineTunePolicy(Policy):
         self.layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2', 'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0', 'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0', 'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
         self.layers = {n1:[] for n1 in self.layers}
         self.architecture = architecture
+        self.optimizer = optimizer
+        self.optimizer.param_groups[0]['params'] = []
         for n1,m1 in architecture.named_modules():
-            if isinstance(m1, nn.Conv2d) or isinstance(m1, nn.BatchNorm2d) or isinstance(m1,nn.ConvTranspose2d):
+            if isinstance(m1, nn.Conv2d) or isinstance(m1,nn.ConvTranspose2d):
                  for n2 in self.layers.keys():
                     if n2 in n1:
                         self.layers[n2].append(m1)
-        # todo: add full layer each time, check spottune,return to ckpt
+            if isinstance(m1, nn.BatchNorm2d):
+                continue
+                self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
+
+
 
         self.return_to_ckpt = return_to_ckpt
-        self.optimizer = optimizer
+
         self.unfreezed_layers = {}
-        self.optimizer.param_groups[0]['params'] = []
+
         self.grad_per_layer = torch.zeros((len(self.layers),3))
         self.last_best = [0,0]
         self.ckpt = [None,None]
@@ -35,7 +41,8 @@ class FineTunePolicy(Policy):
                 if 'init_path.0' in n1 or 'init_path.1' in n1:
                     self.unfreezed_layers[layer_index] = n1
                     self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
-                m1.register_full_backward_hook(self.collect_grads(layer_index))
+                    if 'init_path.0' in n1:
+                        m1.register_full_backward_hook(self.collect_grads())
         print(f'current unfreeze {self.unfreezed_layers}')
 
     def epoch_started(self, epoch: int):
@@ -62,9 +69,10 @@ class FineTunePolicy(Policy):
     def train_step_finished(self, epoch: int, iteration: int, loss: Any):
         for layer_index in range(len(self.layers)):
             if layer_index not in self.unfreezed_layers:
-                self.grad_per_layer[layer_index][0] += self.grad_per_layer[layer_index][1] / self.grad_per_layer[layer_index][2]
-                self.grad_per_layer[layer_index][1] = 0
-                self.grad_per_layer[layer_index][2] = 0
+                if self.grad_per_layer[layer_index][2] != 0:
+                    self.grad_per_layer[layer_index][0] += self.grad_per_layer[layer_index][1] / self.grad_per_layer[layer_index][2]
+                    self.grad_per_layer[layer_index][1] = 0
+                    self.grad_per_layer[layer_index][2] = 0
 
 
 
@@ -81,11 +89,14 @@ class FineTunePolicy(Policy):
         return to_ret
 
 
-    def collect_grads(self,layer_index):
-        def hook(_,__,grad_output):
-            assert len(grad_output) ==1
-            if layer_index not in self.unfreezed_layers:
-                self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(grad_output[0].cpu()))
-                self.grad_per_layer[layer_index][2] += grad_output[0].numel()
-
+    def collect_grads(self):
+        def hook(_,__,___):
+            for layer_index in range(len(self.layers)):
+                if layer_index not in self.unfreezed_layers:
+                    m1_list = self.layers[self.index_to_layer[layer_index]]
+                    for m1 in m1_list:
+                        self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu())) # todo: maybe add bias
+                        self.grad_per_layer[layer_index][2] += m1.weight.numel()
         return hook
+
+

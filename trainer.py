@@ -33,7 +33,8 @@ from dpipe.train.policy import Schedule, TQDM
 from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
-from spottunet.torch.utils import load_model_state_fold_wise, freeze_model,none_func
+from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func
+
 
 class Config:
     def __init__(self, raw):
@@ -132,7 +133,7 @@ val_predict = predict
 load_x = dataset.load_image
 load_y = dataset.load_segm
 
-validate_step = partial(compute_metrics_probably_with_ids, predict=val_predict,
+validate_step = partial(compute_metrics_probably_with_ids if device !='cpu' else empty_dict_func, predict=val_predict,
                         load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics)
 
 logger = WANDBLogger(project=project,dir=exp_dir,entity=None)
