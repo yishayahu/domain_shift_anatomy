@@ -33,19 +33,29 @@ from dpipe.train.policy import Schedule, TQDM
 from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
-from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func
+from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func, \
+    load_by_gradual_id
 
 
 class Config:
-    def __init__(self, raw):
+    def parse(self,raw):
         for k,v in raw.items():
             if type(v) == dict:
                 curr_func = v.pop('FUNC')
                 assert curr_func in globals()
+                for key,val in v.items():
+                    if type(val) == str and val in globals():
+                        v[key] = globals()[val]
                 v = partial(globals()[curr_func],**v)
             elif v in globals():
                 v = globals()[v]
             setattr(self,k,v)
+    def __init__(self, raw):
+        self._second_round = raw.pop('SECOND_ROUND') if 'SECOND_ROUND' in raw else {}
+        self.parse(raw)
+
+    def second_round(self):
+        self.parse(self._second_round)
 
 cli = argparse.ArgumentParser()
 cli.add_argument("--exp_name", default='debug')
@@ -63,6 +73,7 @@ training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
 criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
 batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
+
 batch_size = 16
 project = 'spot2'
 if device == 'cpu':
@@ -70,6 +81,8 @@ if device == 'cpu':
     batches_per_epoch = 2
     batch_size = 2
     project = 'spot3'
+cfg.second_round()
+sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
 
 shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
@@ -188,7 +201,7 @@ x_patch_size = y_patch_size = np.array([256, 256])
 
 
 batch_iter = Infinite(
-    load_by_random_id(dataset.load_image, dataset.load_segm, ids=train_ids,
+    sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
                       weights=ids_sampling_weights, random_state=seed),
     unpack_args(get_random_slice, interval=slice_sampling_interval),
     unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
