@@ -22,8 +22,11 @@ class FineTunePolicy(Policy):
                     if n2 in n1:
                         self.layers[n2].append(m1)
             if isinstance(m1, nn.BatchNorm2d):
-                continue
-                self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
+                for n2 in self.layers.keys():
+                    if n2 in n1:
+                        self.layers[n2].append(m1)
+                # continue
+                # self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
 
 
 
@@ -95,8 +98,11 @@ class FineTunePolicy(Policy):
                 if layer_index not in self.unfreezed_layers:
                     m1_list = self.layers[self.index_to_layer[layer_index]]
                     for m1 in m1_list:
-                        self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu())) # todo: maybe add bias
+                        self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu()))
                         self.grad_per_layer[layer_index][2] += m1.weight.numel()
+                        if m1.bias is not None:
+                            self.grad_per_layer[layer_index][1] +=  torch.sum(torch.abs(m1.bias.grad.cpu()))
+                            self.grad_per_layer[layer_index][2] += m1.bias.numel()
         return hook
 
 

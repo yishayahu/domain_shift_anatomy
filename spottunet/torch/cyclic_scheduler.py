@@ -14,7 +14,7 @@ class CyclicScheduler(ValuePolicy):
 
     @property
     def value(self):
-        return self.sched.get_last_lr()
+        return self.sched.get_last_lr()[0]
     @value.setter
     def value(self,val):
         pass
