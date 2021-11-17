@@ -15,7 +15,7 @@ from dpipe.train import train, Checkpoints, Policy
 from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
 
-from spottunet.torch.cyclic_scheduler import CyclicScheduler
+from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy
 from spottunet.torch.losses import FineRegularizedLoss
 from spottunet.torch.model import train_step
@@ -163,7 +163,7 @@ optimizer = torch.optim.SGD(
 )
 lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
 if type(lr) == partial:
-    lr = lr(optimizer)
+    lr = lr()
 
 
 # if type(logger) == WANDBLogger:

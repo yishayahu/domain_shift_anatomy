@@ -8,4 +8,8 @@ BATCHES_PER_EPOCH: 50
 TRAINING_POLICY:
   FUNC: "FineTunePolicy"
   return_to_ckpt: True
+SCHDULER:
+  FUNC: DecreasingOnPlateauOfVal
+  initial: 0.001
+  multiplier: 0.6
 
