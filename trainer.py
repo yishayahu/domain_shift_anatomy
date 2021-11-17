@@ -34,7 +34,7 @@ from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
 from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func, \
-    load_by_gradual_id
+    load_by_gradual_id, load_by_gradual_id2
 
 
 class Config:

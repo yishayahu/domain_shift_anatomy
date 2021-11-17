@@ -1,0 +1,9 @@
+EXP_NAME: "gradual_tl2"
+EXP_DIR: "/home/dsi/shaya/dart_results/gradual_tl2/experiment_0/"
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+SECOND_ROUND:
+  SAMPLE_FUNC:
+    FUNC: 'load_by_gradual_id2'
+    batches_per_epoch: batches_per_epoch
+    batch_size: batch_size
