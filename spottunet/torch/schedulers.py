@@ -38,6 +38,7 @@ class DecreasingOnPlateauOfVal(ValuePolicy):
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
         if self.detect_plateau(metrics):
             self.value *= self.lr_dec_mul
+            print(f'current lr is {self.value}')
             self.last_best = [0,0]
 
     def detect_plateau(self,metrics):
