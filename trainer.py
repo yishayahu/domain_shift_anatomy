@@ -16,7 +16,7 @@ from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
 
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
-from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy
+from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist
 from spottunet.torch.losses import FineRegularizedLoss
 from spottunet.torch.model import train_step
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
@@ -68,7 +68,7 @@ device = opts.device if torch.cuda.is_available() else 'cpu'
 exp_dir = cfg.EXP_DIR
 freeze_func = cfg.FREEZE_FUNC
 n_epochs = cfg.NUM_EPOCHS
-training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
+
 
 criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
@@ -81,8 +81,7 @@ if device == 'cpu':
     batches_per_epoch = 2
     batch_size = 2
     project = 'spot3'
-cfg.second_round()
-sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
+
 
 shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
 shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
@@ -176,9 +175,13 @@ preload_model_fn(architecture=reference_architecture, baseline_exp_path=baseline
                  n_folds=len(dataset.df.fold.unique()))
 if 'nimrod_reg' == cfg.EXP_NAME:
     criterion = criterion(architecture,reference_architecture)
-
-train_kwargs = dict(lr=lr, architecture=architecture, optimizer=optimizer, criterion=criterion,
+cfg.second_round()
+sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
+training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
+train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion,
                     alpha_l2sp=alpha_l2sp, reference_architecture=reference_architecture,train_step_logger=logger)
+if lr:
+    train_kwargs['lr'] = lr
 
 
 checkpoints = Checkpoints(checkpoints_path, {
@@ -210,7 +213,7 @@ batch_iter = Infinite(
     batch_size=batch_size, batches_per_epoch=batches_per_epoch
 )
 if training_policy is not None:
-    training_policy = training_policy(architecture=architecture,optimizer=optimizer)
+    training_policy = training_policy()
 train_model = partial(train,
     train_step=train_step,
     batch_iter=batch_iter,

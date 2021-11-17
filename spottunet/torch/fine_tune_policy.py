@@ -1,4 +1,5 @@
 from collections import Sequence
+from functools import partial
 from typing import Any
 
 import torch
@@ -106,3 +107,76 @@ class FineTunePolicy(Policy):
         return hook
 
 
+
+
+class FineTunePolicyUsingDist(Policy):
+    def __init__(self,architecture,reference_architecture,optimizer):
+        self.layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2', 'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0', 'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0', 'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
+        self.layers = {n1:[] for n1 in self.layers}
+        self.architecture = architecture
+        self.optimizer = optimizer
+        self.optimizer.param_groups.append({k:v for k,v in self.optimizer.param_groups[0].items() if k != 'params'})
+        self.optimizer.param_groups[1]['params'] = []
+        self.optimizer.param_groups[0]['lr'] = 1e-10
+
+        self.unfreezed_layers = set()
+        self.last_best = [0,0]
+
+        for (n1,m1),(n2,m2) in zip(architecture.named_modules(),reference_architecture.named_modules()):
+            assert n1 == n2
+            if isinstance(m1, nn.Conv2d) or isinstance(m1,nn.ConvTranspose2d) or isinstance(m1, nn.BatchNorm2d):
+                for n3 in self.layers.keys():
+                    if n3 in n1:
+                        self.layers[n3].append((m1,m2))
+        m_list = self.layers['init_path.1']
+        self.transfer_params('init_path.1',m_list)
+        print(f'current unfreeze {self.unfreezed_layers}')
+
+    def transfer_params(self,name1,m_list):
+        for m1,_ in m_list:
+            ind = self.index_in_optimizer(m1.weight)
+            self.optimizer.param_groups[1]['params'].append(self.optimizer.param_groups[0]['params'].pop(ind))
+            if m1.bias is not None:
+                ind = self.index_in_optimizer(m1.bias)
+                self.optimizer.param_groups[1]['params'].append(self.optimizer.param_groups[0]['params'].pop(ind))
+        self.unfreezed_layers.add(name1)
+
+    def index_in_optimizer(self,p1):
+        for i,param in enumerate(self.optimizer.param_groups[0]['params']):
+            if param is p1:
+                return i
+        assert False
+    @staticmethod
+    def max_aux(unfreezed,x):
+        n1,m_list = x
+        if n1 in unfreezed:
+            return 0
+        dist = 0
+        num_elem = 0
+        for m1,m2 in m_list:
+            dist+=torch.sum(torch.abs((m1.weight - m2.weight)))
+            num_elem+=m1.weight.numel()
+            if m1.bias is not None:
+                dist+=torch.sum(torch.abs((m1.bias - m2.bias)))
+                num_elem+=m1.bias.numel()
+        return dist / num_elem
+
+
+    def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
+        if self.detect_plateau(metrics):
+            n1,m_list = max(self.layers.items(),key=partial(self.max_aux,self.unfreezed_layers))
+            print(f'unfreezing {n1}')
+            self.transfer_params(n1,m_list)
+            print(f'current unfreeze {self.unfreezed_layers}')
+
+    def detect_plateau(self,metrics):
+        curr_metric = metrics['sdice_score']
+        if curr_metric < self.last_best[1]*1.001 and self.last_best[1]< self.last_best[0]*1.001:
+            to_ret = True
+        else:
+            to_ret = False
+        self.last_best.append(curr_metric)
+        print('last scores')
+        print(self.last_best)
+        self.last_best = self.last_best[-2:]
+        return to_ret

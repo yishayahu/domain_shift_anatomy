@@ -79,7 +79,13 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
 
             plt.plot(list(range(len(v))),v)
             plt.savefig(im_path)
-            wandb.log({f'{k}':wandb.Image(im_path)},step=train_step_logger._experiment.step)
+
+            log_log = {f'{k}':wandb.Image(im_path)}
+            if len(optimizer.param_groups) > 1:
+                for i in range(len(optimizer.param_groups)):
+                    print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
+                    log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']
+            wandb.log(log_log,step=train_step_logger._experiment.step)
             plt.cla()
             plt.clf()
 
