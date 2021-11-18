@@ -164,6 +164,7 @@ class FineTunePolicyUsingDist(Policy):
 
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
         if self.detect_plateau(metrics):
+            self.last_best = [0,0]
             n1,m_list = max(self.layers.items(),key=partial(self.max_aux,self.unfreezed_layers))
             print(f'unfreezing {n1}')
             self.transfer_params(n1,m_list)

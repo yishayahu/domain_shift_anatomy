@@ -169,7 +169,7 @@ if __name__ == '__main__':
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
-    training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
+    training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
 
