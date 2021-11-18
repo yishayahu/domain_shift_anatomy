@@ -97,7 +97,7 @@ if __name__ == '__main__':
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     batch_size = 16
     lr_init = 1e-3
-    project = 'spot4'
+    project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
 
 
     if opts.exp_namem == 'debug':
