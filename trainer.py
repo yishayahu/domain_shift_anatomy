@@ -49,11 +49,14 @@ class Config:
         for k,v in raw.items():
             if type(v) == dict:
                 curr_func = v.pop('FUNC')
+                return_as_class = v.pop('as_class',False)
                 assert curr_func in globals()
                 for key,val in v.items():
                     if type(val) == str and val in globals():
                         v[key] = globals()[val]
                 v = partial(globals()[curr_func],**v)
+                if return_as_class:
+                    v = v()
             elif v in globals():
                 v = globals()[v]
             setattr(self,k,v)
@@ -107,7 +110,7 @@ if __name__ == '__main__':
     ## training params
     freeze_func = cfg.FREEZE_FUNC
     n_epochs = cfg.NUM_EPOCHS
-    criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
+
 
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     spot = getattr(cfg,'SPOT',False)
@@ -167,6 +170,8 @@ if __name__ == '__main__':
     cfg.second_round()
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
+    criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
+
 
 
     if spot:
@@ -246,8 +251,6 @@ if __name__ == '__main__':
         multiply(np.float32),
         batch_size=batch_size, batches_per_epoch=batches_per_epoch
     )
-    if training_policy is not None:
-        training_policy = training_policy()
     train_model = partial(train,
         train_step=train_step_func,
         batch_iter=batch_iter,
