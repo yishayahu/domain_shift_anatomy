@@ -45,8 +45,8 @@ class FineTunePolicy(Policy):
                 if 'init_path.1' in n1:
                     self.unfreezed_layers[layer_index] = n1
                     self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
-                    if 'init_path.0' in n1:
-                        m1.register_full_backward_hook(self.collect_grads())
+                if 'init_path.0' in n1:
+                    m1.register_full_backward_hook(self.collect_grads())
         print(f'current unfreeze {self.unfreezed_layers}')
 
     def epoch_started(self, epoch: int):
