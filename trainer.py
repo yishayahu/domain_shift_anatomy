@@ -198,7 +198,6 @@ if __name__ == '__main__':
             'optimizer.pth': optimizer, 'optimizer_policy.pth': optimizer_policy
         })
         train_step_func = train_step_spottune
-        freeze_func = freeze_model_spottune
 
     else:
         @slicewise  # 3D -> 2D iteratively
