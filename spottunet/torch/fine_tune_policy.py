@@ -42,7 +42,7 @@ class FineTunePolicy(Policy):
         for layer_index,(n1,m_list) in enumerate(self.layers.items()):
             self.index_to_layer[layer_index] = n1
             for m1 in m_list:
-                if 'init_path.0' in n1 or 'init_path.1' in n1:
+                if 'init_path.1' in n1:
                     self.unfreezed_layers[layer_index] = n1
                     self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
                     if 'init_path.0' in n1:
