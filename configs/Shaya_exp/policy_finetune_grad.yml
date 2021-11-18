@@ -1,14 +1,11 @@
 FREEZE_FUNC:
   FUNC: "none_func"
-  exclude_layers: [ ]
 NUM_EPOCHS: 120
 BATCHES_PER_EPOCH: 50
-SCHDULER: False
 SECOND_ROUND:
   TRAINING_POLICY:
-    FUNC: "FineTunePolicyUsingDist"
+    FUNC: "FineTunePolicy"
+    return_to_ckpt: False
     optimizer: optimizer
     architecture: architecture
-    reference_architecture: reference_architecture
     as_class: True
-
