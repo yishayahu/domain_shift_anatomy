@@ -197,7 +197,7 @@ if __name__ == '__main__':
                             architecture_main=architecture, architecture_policy=architecture_policy,
                             temperature=temperature, with_source=False, optimizer_main=optimizer,
                             optimizer_policy=optimizer_policy, criterion=criterion,soft=cfg.SOFT)
-        checkpoints = Checkpoints(checkpoints_path, {
+        checkpoints = CheckpointsWithBest(checkpoints_path, {
             **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
             'model.pth': architecture, 'model_policy.pth': architecture_policy,
             'optimizer.pth': optimizer, 'optimizer_policy.pth': optimizer_policy

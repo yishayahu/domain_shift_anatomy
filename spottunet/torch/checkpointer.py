@@ -25,6 +25,6 @@ class CheckpointsWithBest(Checkpoints):
             self._clear_checkpoint(iteration - 1)
 
     def best_model_ckpt(self):
-        self._get_best_checkpoint_folder() / 'model.pth'
+        return self._get_best_checkpoint_folder() / 'model.pth'
     def best_policy_ckpt(self):
-        self._get_best_checkpoint_folder() / 'model_policy.pth'
+        return self._get_best_checkpoint_folder() / 'model_policy.pth'
