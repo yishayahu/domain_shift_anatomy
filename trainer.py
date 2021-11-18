@@ -97,7 +97,7 @@ if __name__ == '__main__':
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     batch_size = 16
     lr_init = 1e-3
-    project = 'spot2'
+    project = 'spot4'
 
 
     if opts.exp_namem == 'debug':
