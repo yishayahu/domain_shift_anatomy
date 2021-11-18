@@ -18,13 +18,15 @@ def gumbel_softmax_sample(logits, temperature, use_gumbel=True):
     return F.softmax(y / temperature, dim=-1)
 
 
-def gumbel_softmax(logits, use_gumbel=True, temperature=5):
+def gumbel_softmax(logits,soft, use_gumbel=True, temperature=5,):
     """
     input: [*, n_class]
     return: [*, n_class] an one-hot vector
     """
+    if soft:
+        y = gumbel_softmax_sample(logits, temperature, use_gumbel=False)
+        return y
     y = gumbel_softmax_sample(logits, temperature, use_gumbel=use_gumbel)
-
     shape = y.size()
     _, ind = y.max(dim=-1)
     y_hard = torch.zeros_like(y).view(-1, shape[-1])

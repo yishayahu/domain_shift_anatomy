@@ -17,7 +17,6 @@ class UNet2D(nn.Module):
             ResBlock2d(n, n, kernel_size=3, padding=1),
         )
 
-
         self.down1 = nn.Sequential(
             PreActivation2d(n, n * 2, kernel_size=2, stride=2, bias=False),
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1),
@@ -25,14 +24,12 @@ class UNet2D(nn.Module):
             ResBlock2d(n * 2, n * 2, kernel_size=3, padding=1)
         )
 
-
         self.down2 = nn.Sequential(
             PreActivation2d(n * 2, n * 4, kernel_size=2, stride=2, bias=False),
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1),
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1),
             ResBlock2d(n * 4, n * 4, kernel_size=3, padding=1)
         )
-
 
         self.bottleneck = nn.Sequential(
             PreActivation2d(n * 4, n * 8, kernel_size=2, stride=2, bias=False),
@@ -66,7 +63,6 @@ class UNet2D(nn.Module):
         )
 
     def forward(self, x):
-
         x0 = self.init_path(x)
         x1 = self.down1(x0)
         x2 = self.down2(x1)

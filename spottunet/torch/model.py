@@ -11,13 +11,17 @@ from dpipe.im.utils import identity, dmap
 from dpipe.torch.utils import *
 from dpipe.torch.model import *
 
-
 from spottunet.torch.functional import gumbel_softmax
 
-layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2', 'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0', 'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0', 'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
+layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2',
+          'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0',
+          'bottleneck.1', 'bottleneck.2', 'bottleneck.3', 'bottleneck.4', 'up2.0', 'up2.1', 'up2.2', 'up2.3', 'up1.0',
+          'up1.1', 'up1.2', 'up1.3', 'out_path.0', 'out_path.1', 'out_path.2', 'out_path.3', 'out_path.4']
 prev_step = -1
+
+
 def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None, reference_architecture=None,train_step_logger=None, **optimizer_params):
+               alpha_l2sp=None, reference_architecture=None, train_step_logger=None, **optimizer_params):
     architecture.train()
     if n_targets >= 0:
         n_inputs = len(inputs) - n_targets
@@ -41,22 +45,24 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         normalize_dist_per_layer_bn = []
         names = []
         names_bn = []
-        for (n1,p1), (n2,p2) in zip(architecture.named_parameters(), reference_architecture.named_parameters()):
+        for (n1, p1), (n2, p2) in zip(architecture.named_parameters(), reference_architecture.named_parameters()):
             assert n1 == n2
             if 'out_path.4' in n1 or 'out_path.3.layer.bias' in n1:
                 continue
             if 'bn' in n1:
-                dist_pet_layer_bn.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2.cpu()))))
+                dist_pet_layer_bn.append(float(torch.mean(torch.abs(p1.detach().cpu() - p2.cpu()))))
                 param_size_per_layer_bn.append(float(torch.mean(torch.abs(p1))))
-                normalize_dist_per_layer_bn.append(dist_pet_layer[-1]/param_size_per_layer[-1])
+                normalize_dist_per_layer_bn.append(dist_pet_layer[-1] / param_size_per_layer[-1])
                 names_bn.append(n1)
             else:
-                dist_pet_layer.append(float(torch.mean(torch.abs(p1.detach().cpu()-p2.cpu()))))
+                dist_pet_layer.append(float(torch.mean(torch.abs(p1.detach().cpu() - p2.cpu()))))
                 param_size_per_layer.append(float(torch.mean(torch.abs(p1))))
-                normalize_dist_per_layer.append(dist_pet_layer[-1]/param_size_per_layer[-1])
+                normalize_dist_per_layer.append(dist_pet_layer[-1] / param_size_per_layer[-1])
                 names.append(n1)
 
-        for k,v in {'dist':dist_pet_layer,'param_size':param_size_per_layer,'relative_dist':normalize_dist_per_layer,'dist_bn':dist_pet_layer_bn,'param_size_bn':param_size_per_layer_bn,'relative_dist_bn':normalize_dist_per_layer_bn}.items():
+        for k, v in {'dist': dist_pet_layer, 'param_size': param_size_per_layer,
+                     'relative_dist': normalize_dist_per_layer, 'dist_bn': dist_pet_layer_bn,
+                     'param_size_bn': param_size_per_layer_bn, 'relative_dist_bn': normalize_dist_per_layer_bn}.items():
             im_path = f'{train_step_logger._experiment.name}_{k}.png'
             if 'bn' in k:
                 curr_names = names_bn
@@ -64,15 +70,15 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
                 curr_names = names
             print(f'max for {k} is in layer {curr_names[np.argmax(v)]} and its values is {np.max(v)}')
 
-            plt.plot(list(range(len(v))),v)
+            plt.plot(list(range(len(v))), v)
             plt.savefig(im_path)
 
-            log_log = {f'{k}':wandb.Image(im_path)}
+            log_log = {f'{k}': wandb.Image(im_path)}
             if len(optimizer.param_groups) > 1 and k == 'dist':
                 for i in range(len(optimizer.param_groups)):
                     print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
                     log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']
-            wandb.log(log_log,step=train_step_logger._experiment.step)
+            wandb.log(log_log, step=train_step_logger._experiment.step)
             plt.cla()
             plt.clf()
 
@@ -81,7 +87,7 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         return dmap(to_np, loss)
     if type(loss) == dict:
         optimizer_step(optimizer, loss['total_loss_'], **optimizer_params)
-        loss = {k:float(v) for (k,v) in loss.items()}
+        loss = {k: float(v) for (k, v) in loss.items()}
     else:
         optimizer_step(optimizer, loss, **optimizer_params)
         loss = to_np(loss)
@@ -90,9 +96,8 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
 
 def train_step_spottune(*inputs: np.ndarray, architecture_main, architecture_policy, k_reg, reg_mode, temperature,
                         criterion: Callable, optimizer_main: Optimizer, optimizer_policy: Optimizer,
-                        n_targets: int = 1, loss_key: str = None, k_reg_source=None, with_source=False, alpha_l2sp=None,
+                        n_targets: int = 1, loss_key: str = None, k_reg_source=None, with_source=False, soft=False,
                         **optimizer_params) -> np.ndarray:
-
     architecture_main.train()
     architecture_policy.train()
 
@@ -106,47 +111,31 @@ def train_step_spottune(*inputs: np.ndarray, architecture_main, architecture_pol
 
         #  getting the policy (source)
         probs_source = architecture_policy(inputs_source)  # [batch, 16]
-        action_source = gumbel_softmax(probs_source.view(probs_source.size(0), -1, 2),
+        action_source = gumbel_softmax(probs_source.view(probs_source.size(0), -1, 2), soft=soft,
                                        temperature=temperature)  # [batch, 8, 2]
         policy_source = action_source[:, :, 1]  # [batch, 8]
 
         # getting the policy (target)
         probs = architecture_policy(inputs_target)  # [batch, 16]
-        action = gumbel_softmax(probs.view(probs.size(0), -1, 2), temperature=temperature)  # [batch, 8, 2]
+        action = gumbel_softmax(probs.view(probs.size(0), -1, 2), soft=soft, temperature=temperature)  # [batch, 8, 2]
         policy = action[:, :, 1]  # [batch, 8]
 
         # forward (target)
         outputs = architecture_main.forward(inputs_target, policy)
-        loss = criterion(outputs, targets_target) + reg_policy(policy=policy, k=k_reg, mode=reg_mode) +\
-            reg_policy(policy=policy_source, k=k_reg_source)
+        loss = criterion(outputs, targets_target) + reg_policy(policy=policy, k=k_reg, mode=reg_mode) + \
+               reg_policy(policy=policy_source, k=k_reg_source)
 
     else:
         inputs, targets = inputs[0], inputs[1]
 
         # getting the policy (target)
         probs = architecture_policy(inputs)  # [32, 16]
-        action = gumbel_softmax(probs.view(probs.size(0), -1, 2), temperature=temperature)  # [32, 8, 2]
+        action = gumbel_softmax(probs.view(probs.size(0), -1, 2), soft=soft, temperature=temperature)  # [32, 8, 2]
         policy = action[:, :, 1]  # [32, 8]
 
         # forward (target)
         outputs = architecture_main.forward(inputs, policy)
-
-        if alpha_l2sp is not None:
-            params_unfr, params_frzd = [], []
-            for n, p in architecture_main.named_parameters():
-                if 'freezed' in n:
-                    params_frzd.append(p)
-                else:
-                    params_unfr.append(p)
-
-            w_diff = torch.tensor(0., requires_grad=True, dtype=torch.float32)
-            w_diff.to(get_device(architecture_main))
-            for p1, p2 in zip(params_frzd, params_unfr):
-                w_diff = w_diff + torch.sum((p1 - p2) ** 2)
-
-            loss = criterion(outputs, targets) + reg_policy(policy=policy, k=k_reg, mode=reg_mode) + alpha_l2sp * w_diff
-        else:
-            loss = criterion(outputs, targets) + reg_policy(policy=policy, k=k_reg, mode=reg_mode)
+        loss = criterion(outputs, targets) + reg_policy(policy=policy, k=k_reg, mode=reg_mode)
 
     optimizer_step_spottune(optimizer_main, optimizer_policy, loss, **optimizer_params)
 
@@ -154,7 +143,7 @@ def train_step_spottune(*inputs: np.ndarray, architecture_main, architecture_pol
 
 
 def inference_step_spottune(*inputs: np.ndarray, architecture_main: Module, architecture_policy: Module, temperature,
-                            use_gumbel, activation: Callable = identity) -> np.ndarray:
+                            use_gumbel, activation: Callable = identity, soft=False) -> np.ndarray:
     """
     Returns the prediction for the given ``inputs``.
 
@@ -170,7 +159,7 @@ def inference_step_spottune(*inputs: np.ndarray, architecture_main: Module, arch
     net_input = sequence_to_var(*inputs, device=architecture_main)
 
     probs = architecture_policy(*net_input)
-    action = gumbel_softmax(probs.view(probs.size(0), -1, 2), use_gumbel=use_gumbel, temperature=temperature)
+    action = gumbel_softmax(probs.view(probs.size(0), -1, 2), soft=soft, use_gumbel=use_gumbel, temperature=temperature)
     policy = action[:, :, 1]
 
     with torch.no_grad():

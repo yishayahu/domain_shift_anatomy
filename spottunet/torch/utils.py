@@ -85,25 +85,6 @@ def unfreeze_model(model):
 
 
 def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
-    random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16):
-    source_ids = ids[:-2]
-    target_ids = ids[-2:]
-    random.shuffle(source_ids)
-    ids = source_ids+target_ids
-    while True:
-        print('ids',len(ids))
-        for step_counter,id_ in enumerate(sample(ids, weights, random_state)):
-
-            if step_counter == batches_per_epoch*batch_size:
-                break
-            yield squeeze_first(tuple(pam(loaders, id_)))
-        if len(ids)>2:
-            ids.pop(0)
-        if len(ids)>2 and random.random() < 0.5:
-            ids.pop(0)
-
-
-def load_by_gradual_id2(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
                        random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16):
     source_ids = ids[:-2]
     target_ids = ids[-2:]

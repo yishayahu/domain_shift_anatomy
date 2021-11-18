@@ -104,7 +104,7 @@ class UNet2D(nn.Module):
 
         for layer_ft, layer_fr in zip(block_ft, block_fr):
             policy_current = action_mask[..., i]
-            x = layer_ft(x)*(1-policy_current) + layer_fr(x)*policy_current
+            x = layer_ft(x) * (1 - policy_current) + layer_fr(x) * policy_current
             if isinstance(layer_ft, self.parallelized_blocks):
                 i += 1
         return x, i
@@ -116,7 +116,7 @@ class UNet2D(nn.Module):
         i = 0
 
         x, i = self.forward_block(x, self.init_path, self.init_path_freezed, action_mask, i)
-        shortcut0 = self.shortcut0(x)*(1-action_mask[..., self.policy_shape - 3]) + self.shortcut0_freezed(x) * \
+        shortcut0 = self.shortcut0(x) * (1 - action_mask[..., self.policy_shape - 3]) + self.shortcut0_freezed(x) * \
                     action_mask[..., self.policy_shape - 3]
 
         x, i = self.forward_block(x, self.down1, self.down1_freezed, action_mask, i)
@@ -165,10 +165,10 @@ class UNet2D(nn.Module):
         self.val_iter_tracker = 0
 
         tb_record = {}
-        for i in range(self.policy_shape-3):
-            tb_record['val: block ' + str(i+1)] = val_stats[i]
-        for i in range(self.policy_shape-3, self.policy_shape):
-            tb_record['val: shortcut ' + str(i-(self.policy_shape-4))] = val_stats[i]
+        for i in range(self.policy_shape - 3):
+            tb_record['val: block ' + str(i + 1)] = val_stats[i]
+        for i in range(self.policy_shape - 3, self.policy_shape):
+            tb_record['val: shortcut ' + str(i - (self.policy_shape - 4))] = val_stats[i]
 
         return tb_record
 
@@ -181,10 +181,9 @@ class UNet2D(nn.Module):
         self.policy_tracker_temp = self.policy_tracker.clone()
 
         tb_record = {}
-        for i in range(self.policy_shape-3):
-            tb_record['train: block ' + str(i+1)] = train_stats[i]
-        for i in range(self.policy_shape-3, self.policy_shape):
-            tb_record['train: shortcut ' + str(i-(self.policy_shape-4))] = train_stats[i]
+        for i in range(self.policy_shape - 3):
+            tb_record['train: block ' + str(i + 1)] = train_stats[i]
+        for i in range(self.policy_shape - 3, self.policy_shape):
+            tb_record['train: shortcut ' + str(i - (self.policy_shape - 4))] = train_stats[i]
 
         return tb_record
-

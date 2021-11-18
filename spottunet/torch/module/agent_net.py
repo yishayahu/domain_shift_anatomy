@@ -50,9 +50,9 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
 
         factor = 1
-        self.in_planes = int(32*factor)
-        self.conv1 = conv3x3(1, int(32*factor))
-        self.bn1 = nn.BatchNorm2d(int(32*factor))
+        self.in_planes = int(32 * factor)
+        self.conv1 = conv3x3(1, int(32 * factor))
+        self.bn1 = nn.BatchNorm2d(int(32 * factor))
         self.relu = nn.ReLU(inplace=True)
 
         strides = [2, 2, 2]
@@ -64,10 +64,10 @@ class ResNet(nn.Module):
             blocks, ds = self._make_layer(block, filt_size, num_blocks, stride=stride)
             self.blocks.append(nn.ModuleList(blocks))
             self.ds.append(ds)
-            
+
         self.blocks = nn.ModuleList(self.blocks)
         self.ds = nn.ModuleList(self.ds)
-    
+
         for idx, (filt_size, num_blocks, stride) in enumerate(zip(filt_sizes, layers, strides)):
             blocks, ds = self._make_layer(block, filt_size, num_blocks, stride=stride)
             self.parallel_blocks.append(nn.ModuleList(blocks))
@@ -75,9 +75,9 @@ class ResNet(nn.Module):
         self.parallel_blocks = nn.ModuleList(self.parallel_blocks)
         self.parallel_ds = nn.ModuleList(self.parallel_ds)
 
-        self.bn2 = nn.Sequential(nn.BatchNorm2d(int(256*factor)), nn.ReLU(True)) 
-        self.avgpool = nn.AdaptiveAvgPool2d(1)        
-        self.linear = nn.Linear(int(256*factor), num_class)
+        self.bn2 = nn.Sequential(nn.BatchNorm2d(int(256 * factor)), nn.ReLU(True))
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.linear = nn.Linear(int(256 * factor), num_class)
 
         self.layer_config = layers
         for m in self.modules():
@@ -108,10 +108,10 @@ class ResNet(nn.Module):
     def forward(self, x):
         t = 0
         x = self.seed(x)
-    
+
         for segment, num_blocks in enumerate(self.layer_config):
             for b in range(num_blocks):
-                residual = self.ds[segment](x) if b==0 else x
+                residual = self.ds[segment](x) if b == 0 else x
                 output = self.blocks[segment][b](x)
                 x = F.relu(residual + output)
                 t += 1
