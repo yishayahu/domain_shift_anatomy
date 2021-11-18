@@ -9,7 +9,8 @@ def sample_gumbel(shape, eps=1e-20, device='cuda'):
     if device == torch.device('cpu'):
         u = torch.rand(shape, requires_grad=False, device=device)
     else:
-        u = torch.cuda.FloatTensor(shape).uniform_()
+        u = torch.FloatTensor(shape).uniform_()
+        u = u.to(device)
     return -Variable(torch.log(-torch.log(u + eps) + eps))
 
 

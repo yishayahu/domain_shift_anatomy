@@ -19,6 +19,7 @@ from dpipe.torch import save_model_state, load_model_state, inference_step
 from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
+from spottunet.torch.module.spottune_unet_layerwise import SpottuneUNet2D
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist
 from spottunet.torch.losses import FineRegularizedLoss
@@ -40,7 +41,7 @@ from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
 from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func, \
-    load_by_gradual_id, freeze_model_spottune
+    load_by_gradual_id, freeze_model_spottune, modify_state_fn_spottune
 
 
 class Config:
@@ -140,10 +141,10 @@ if __name__ == '__main__':
                    'sdice_score': partial(aggregate_metric_probably_with_ids, metric=sdice_metric)}
 
 
-    architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
+    architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
-    load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path)
+    load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
 
     logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name,config=cfg_path)
 
@@ -157,8 +158,12 @@ if __name__ == '__main__':
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
     if type(lr) == partial:
         lr = lr()
-    reference_architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
-    load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
+
+    if spot:
+        reference_architecture = None
+    else:
+        reference_architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
+        load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
