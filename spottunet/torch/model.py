@@ -27,22 +27,9 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
     assert 0 <= n_inputs <= len(inputs)
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets = inputs[:n_inputs], inputs[n_inputs:]
-
-    if alpha_l2sp is not None:
-        if reference_architecture is None:
-            raise ValueError('`reference_architecture` should be provided for L2-SP regularization.')
-
-        w_diff = torch.tensor(0., requires_grad=True, dtype=torch.float32)
-        w_diff.to(get_device(architecture))
-        for p1, p2 in zip(architecture.parameters(), reference_architecture.parameters()):
-            w_diff = w_diff + torch.sum((p1 - p2) ** 2)
-
-        loss = criterion(architecture(*inputs), *targets) + alpha_l2sp * w_diff
-    else:
-        loss = criterion(architecture(*inputs), *targets)
+    loss = criterion(architecture(*inputs), *targets)
     global prev_step
     if train_step_logger is not None and train_step_logger._experiment.step > prev_step:
-        print('vizviz')
         prev_step = train_step_logger._experiment.step
         if reference_architecture is None:
             raise ValueError('`reference_architecture` should be provided for wandb')
@@ -81,7 +68,7 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
             plt.savefig(im_path)
 
             log_log = {f'{k}':wandb.Image(im_path)}
-            if len(optimizer.param_groups) > 1:
+            if len(optimizer.param_groups) > 1 and k == 'dist':
                 for i in range(len(optimizer.param_groups)):
                     print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
                     log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']

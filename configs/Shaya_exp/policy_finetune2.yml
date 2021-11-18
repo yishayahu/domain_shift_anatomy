@@ -10,6 +10,6 @@ TRAINING_POLICY:
   return_to_ckpt: True
 SCHDULER:
   FUNC: DecreasingOnPlateauOfVal
-  initial: 0.001
-  multiplier: 0.6
+  initial: 0.002
+  multiplier: 0.7
 

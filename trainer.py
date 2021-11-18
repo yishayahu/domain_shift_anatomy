@@ -1,6 +1,7 @@
 import argparse
 import os
 import shutil
+from pathlib import Path
 
 import dpipe.commands as commands
 import numpy as np
@@ -15,6 +16,7 @@ from dpipe.train import train, Checkpoints, Policy
 from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
 
+from spottunet.torch.checkpointer import CheckpointsWithBest
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist
 from spottunet.torch.losses import FineRegularizedLoss
@@ -56,201 +58,164 @@ class Config:
 
     def second_round(self):
         self.parse(self._second_round)
+if __name__ == '__main__':
+    cli = argparse.ArgumentParser()
+    cli.add_argument("--exp_name", default='debug')
+    cli.add_argument("--config")
+    cli.add_argument("--device", default='cpu')
+    cli.add_argument("--source", default=0)
+    cli.add_argument("--target", default=1)
+    cli.add_argument("--base_res_dir", default='/home/dsi/shaya/spottune_results/')
+    cli.add_argument("--base_split_dir", default='/home/dsi/shaya/data_splits/')
+    cli.add_argument("--ts_size", default=2)
+    opts = cli.parse_args()
+    cfg_path = open(f"configs/Shaya_exp/{opts.config}.yml", "r")
+    cfg = Config(yaml.safe_load(cfg_path))
+    device = opts.device if torch.cuda.is_available() else 'cpu'
+    ## define paths
+    exp_dir = os.path.join(opts.base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
+    Path(exp_dir).mkdir(parents=True,exist_ok=True)
+    lock_dir(exp_dir)
+    splits_dir =  os.path.join(opts.base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
+    log_path = os.path.join(exp_dir,'train_logs')
+    saved_model_path = os.path.join(exp_dir,'model.pth')
+    test_predictions_path = os.path.join(exp_dir,'test_predictions')
+    test_metrics_path = os.path.join(exp_dir,'test_metrics')
+    best_test_metrics_path = os.path.join(exp_dir,'best_test_metrics')
+    checkpoints_path = os.path.join(exp_dir,'checkpoints')
+    data_path = DATA_PATH
+    train_ids = os.path.join(splits_dir,'train_ids.json')
+    test_ids = os.path.join(splits_dir,'test_ids.json')
+    val_ids = os.path.join(splits_dir,'val_ids.json')
+    base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_ckpt.pth')
 
-cli = argparse.ArgumentParser()
-cli.add_argument("--exp_name", default='debug')
-cli.add_argument("--device", default='cpu')
-opts = cli.parse_args()
-cfg = Config(yaml.safe_load(open(f"configs/Shaya_exp/{opts.exp_name}.yml", "r")))
-assert opts.exp_name == cfg.EXP_NAME
-device = opts.device if torch.cuda.is_available() else 'cpu'
+    ## training params
+    freeze_func = cfg.FREEZE_FUNC
+    n_epochs = cfg.NUM_EPOCHS
+    criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
-exp_dir = cfg.EXP_DIR
-freeze_func = cfg.FREEZE_FUNC
-n_epochs = cfg.NUM_EPOCHS
-
-
-criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
-
-batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
-
-batch_size = 16
-project = 'spot2'
-if device == 'cpu':
-    Warning('running on cpu')
-    batches_per_epoch = 2
-    batch_size = 2
-    project = 'spot3'
-
-
-shutil.rmtree(os.path.join(exp_dir,'wandb'),ignore_errors=True)
-shutil.rmtree(os.path.join(exp_dir,'checkpoints'),ignore_errors=True)
-shutil.rmtree(os.path.join(exp_dir,'test_metrics'),ignore_errors=True)
-shutil.rmtree(os.path.join(exp_dir,'test_predictions'),ignore_errors=True)
-if os.path.exists(os.path.join(exp_dir,'model.pth')):
-    os.remove(os.path.join(exp_dir,'model.pth'))
-
-print(f'running {cfg.EXP_NAME}')
-log_path = os.path.join(exp_dir,'train_logs')
-saved_model_path = os.path.join(exp_dir,'model.pth')
-test_predictions_path = os.path.join(exp_dir,'test_predictions')
-test_metrics_path = os.path.join(exp_dir,'test_metrics')
-checkpoints_path = os.path.join(exp_dir,'checkpoints')
-
-
-data_path = DATA_PATH
-
-voxel_spacing = (1, 0.95, 0.95)
-
-preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
-dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
-val_size = 2
-n_add_ids = 1  # 1, 2, 3
-pretrained = True
-
-seed = 0xBadCafe
-n_first_exclude = 0
-n_exps = 30
-split = one2one(dataset.df, val_size=val_size, n_add_ids=n_add_ids,
-                train_on_add_only=pretrained, seed=seed)[n_first_exclude:n_exps]
-layout = Flat(split)
-train_ids = layout.get_ids('train',folder=exp_dir)
-test_ids = layout.get_ids('test',folder=exp_dir)
-val_ids = layout.get_ids('val',folder=exp_dir)
-
-n_chans_in = 1
-n_chans_out = 1
-
-dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
-
-sdice_tolerance = 1
-
-sdice_metric = lambda x, y, i: sdice(get_pred(x), get_pred(y), dataset.load_spacing(i), sdice_tolerance)
-val_metrics = {'dice_score': partial(aggregate_metric_probably_with_ids, metric=dice_metric),
-               'sdice_score': partial(aggregate_metric_probably_with_ids, metric=sdice_metric)}
-
-n_filters = 16
-architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=n_chans_out, n_filters_init=n_filters)
-architecture.to(device)
-
-@slicewise  # 3D -> 2D iteratively
-@add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
-@divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
-def predict(image):
-    return inference_step(image, architecture=architecture, activation=torch.sigmoid)
+    batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
+    batch_size = 16
+    lr_init = 1e-3
+    project = 'spot2'
 
 
-val_predict = predict
-
-load_x = dataset.load_image
-load_y = dataset.load_segm
-
-validate_step = partial(compute_metrics_probably_with_ids if device !='cpu' else empty_dict_func, predict=val_predict,
-                        load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics)
-
-logger = WANDBLogger(project=project,dir=exp_dir,entity=None)
-
-alpha_l2sp = None
-
-lr_init = 1e-3
-optimizer = torch.optim.SGD(
-    architecture.parameters(),
-    lr=lr_init,
-    momentum=0.9,
-    nesterov=True,
-    weight_decay=0
-)
-lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
-if type(lr) == partial:
-    lr = lr()
+    if opts.exp_namem == 'debug':
+        print('debug mode')
+        batches_per_epoch = 2
+        batch_size = 2
+        project = 'spot3'
 
 
-# if type(logger) == WANDBLogger:
-#     logger._experiment.watch(architecture,criterion,log='all',log_graph=False,log_freq=1)
-
-preload_model_fn = load_model_state_fold_wise
-baseline_exp_path = BASELINE_PATH
-reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=n_chans_out, n_filters_init=n_filters)
-preload_model_fn(architecture=reference_architecture, baseline_exp_path=baseline_exp_path,
-                 n_folds=len(dataset.df.fold.unique()))
-if 'nimrod_reg' == cfg.EXP_NAME:
-    criterion = criterion(architecture,reference_architecture)
-cfg.second_round()
-sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
-training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
-train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion,
-                    alpha_l2sp=alpha_l2sp, reference_architecture=reference_architecture,train_step_logger=logger)
-if lr:
-    train_kwargs['lr'] = lr
+    print(f'running {opts.exp_name}')
 
 
-checkpoints = Checkpoints(checkpoints_path, {
-    **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
-    'model.pth': architecture, 'optimizer.pth': optimizer
-})
+    voxel_spacing = (1, 0.95, 0.95)
 
-ids_sampling_weights = None
-slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48 todo: change to be configable
-
-def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
-    sp_dims_2d = (-2, -1)
-    center = sample_center_uniformly(segm_slc.shape, y_patch_size, sp_dims_2d)
-    x, y = extract_patch((image_slc, segm_slc, center), x_patch_size, y_patch_size, spatial_dims=sp_dims_2d)
-    return x, y
+    preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
+    dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
+    seed = 0xBadCafe
 
 
-x_patch_size = y_patch_size = np.array([256, 256])
+    dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
+    sdice_tolerance = 1
+
+    sdice_metric = lambda x, y, i: sdice(get_pred(x), get_pred(y), dataset.load_spacing(i), sdice_tolerance)
+    val_metrics = {'dice_score': partial(aggregate_metric_probably_with_ids, metric=dice_metric),
+                   'sdice_score': partial(aggregate_metric_probably_with_ids, metric=sdice_metric)}
 
 
+    architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
+    architecture.to(device)
+    load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path)
 
-batch_iter = Infinite(
-    sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
-                      weights=ids_sampling_weights, random_state=seed),
-    unpack_args(get_random_slice, interval=slice_sampling_interval),
-    unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
-    multiply(prepend_dims),
-    multiply(np.float32),
-    batch_size=batch_size, batches_per_epoch=batches_per_epoch
-)
-if training_policy is not None:
-    training_policy = training_policy()
-train_model = partial(train,
-    train_step=train_step,
-    batch_iter=batch_iter,
-    n_epochs=n_epochs,
-    logger=logger,
-    checkpoints=checkpoints,
-    validate=validate_step,
-    bar=TQDM(),
-    training_policy=training_policy,
-    **train_kwargs
-)
+    @slicewise  # 3D -> 2D iteratively
+    @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
+    @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
+    def predict(image):
+        return inference_step(image, architecture=architecture, activation=torch.sigmoid)
 
-predict_to_dir = skip_predict
+    validate_step = partial(compute_metrics_probably_with_ids if opts.exp_name != 'debug' else empty_dict_func, predict=predict,
+                            load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
 
-final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
-evaluate_individual_metrics = partial(
-    evaluate_individual_metrics_probably_with_ids_no_pred,
-    load_y=load_y,
-    load_x=load_x,
-    predict=predict,
-    metrics=final_metrics,
-    test_ids=test_ids,
-    logger=logger
-)
+    logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name,config=cfg_path)
+
+    optimizer = torch.optim.SGD(
+        architecture.parameters(),
+        lr=lr_init,
+        momentum=0.9,
+        nesterov=True,
+        weight_decay=0
+    )
+    lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
+    if type(lr) == partial:
+        lr = lr()
+    reference_architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
+    load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
+    cfg.second_round()
+    sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
+    training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy)
+    train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger)
+    if lr:
+        train_kwargs['lr'] = lr
+    checkpoints = CheckpointsWithBest(checkpoints_path, {
+            **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
+            'model.pth': architecture, 'optimizer.pth': optimizer
+        })
+
+    ids_sampling_weights = None
+    slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48 todo: change to be configable
+
+    def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
+        sp_dims_2d = (-2, -1)
+        center = sample_center_uniformly(segm_slc.shape, y_patch_size, sp_dims_2d)
+        x, y = extract_patch((image_slc, segm_slc, center), x_patch_size, y_patch_size, spatial_dims=sp_dims_2d)
+        return x, y
 
 
+    x_patch_size = y_patch_size = np.array([256, 256])
+    batch_iter = Infinite(
+        sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
+                          weights=ids_sampling_weights, random_state=seed),
+        unpack_args(get_random_slice, interval=slice_sampling_interval),
+        unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
+        multiply(prepend_dims),
+        multiply(np.float32),
+        batch_size=batch_size, batches_per_epoch=batches_per_epoch
+    )
+    if training_policy is not None:
+        training_policy = training_policy()
+    train_model = partial(train,
+        train_step=train_step,
+        batch_iter=batch_iter,
+        n_epochs=n_epochs,
+        logger=logger,
+        checkpoints=checkpoints,
+        validate=validate_step,
+        bar=TQDM(),
+        training_policy=training_policy,
+        **train_kwargs
+    )
 
-run_experiment = run(
-    fix_seed(seed=0xBAAAAAAD),
-    lock_dir(exp_dir),
-    preload_model_fn(architecture=architecture, baseline_exp_path=baseline_exp_path,
-                     n_folds=len(dataset.df.fold.unique())),
-    freeze_func(architecture),
+    predict_to_dir = skip_predict
+    final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
+    evaluate_individual_metrics = partial(
+        evaluate_individual_metrics_probably_with_ids_no_pred,
+        load_y=dataset.load_segm,
+        load_x=dataset.load_image,
+        predict=predict,
+        metrics=final_metrics,
+        test_ids=test_ids,
+        logger=logger
+    )
+    run_experiment = run(
+        fix_seed(seed=0xBAAAAAAD),
+        freeze_func(architecture),
+        if_missing(lambda p: [train_model(), save_model_state(architecture, p)], saved_model_path),
+        load_model_state(architecture, saved_model_path),
+        if_missing(predict_to_dir, output_path=test_predictions_path),
+        if_missing(evaluate_individual_metrics, results_path=test_metrics_path),
+        load_model_state(architecture, checkpoints.best_model_ckpt()),
+        if_missing(partial(evaluate_individual_metrics,best='_best'), results_path=best_test_metrics_path),
+    )
 
-    if_missing(lambda p: [train_model(), save_model_state(architecture, p)], saved_model_path),
-    load_model_state(architecture, saved_model_path),
-    if_missing(predict_to_dir, output_path=test_predictions_path),
-    if_missing(evaluate_individual_metrics, results_path=test_metrics_path),
-)
-debugging_mode = False

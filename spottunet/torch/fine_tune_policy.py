@@ -154,10 +154,10 @@ class FineTunePolicyUsingDist(Policy):
         dist = 0
         num_elem = 0
         for m1,m2 in m_list:
-            dist+=torch.sum(torch.abs((m1.weight - m2.weight)))
+            dist+=torch.sum(torch.abs((m1.weight.detach().cpu() - m2.weight.cpu())))
             num_elem+=m1.weight.numel()
             if m1.bias is not None:
-                dist+=torch.sum(torch.abs((m1.bias - m2.bias)))
+                dist+=torch.sum(torch.abs((m1.bias.detach().cpu() - m2.bias.cpu())))
                 num_elem+=m1.bias.numel()
         return dist / num_elem
 

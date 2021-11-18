@@ -68,7 +68,7 @@ def multichannel_pred_metric_reduction(true3d, pred4d, metric=dice_score, pred_r
 
 
 def evaluate_individual_metrics_probably_with_ids_no_pred(load_y, load_x, predict, metrics: dict, test_ids,
-                                                          results_path, exist_ok=False,logger=None):
+                                                          results_path, exist_ok=False,logger=None,best=''):
     assert len(metrics) > 0, 'No metric provided'
     os.makedirs(results_path, exist_ok=exist_ok)
 
@@ -86,7 +86,7 @@ def evaluate_individual_metrics_probably_with_ids_no_pred(load_y, load_x, predic
     for metric_name, result in results.items():
         save_json(result, os.path.join(results_path, metric_name + '.json'), indent=0)
         if logger is not None:
-            logger.value(f'test_{metric_name}',np.mean(list(result.values())))
+            logger.value(f'test_{metric_name}{best}',np.mean(list(result.values())))
 
 
 def evaluate_individual_metrics_with_hm(load_y, load_x, predict, metrics: dict, test_ids, train_ids,

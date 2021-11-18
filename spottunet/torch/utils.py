@@ -1,10 +1,14 @@
+import random
+from typing import Sequence, Callable, Union
 import os
 from copy import deepcopy
 
+import numpy as np
 import torch
+from dpipe.batch_iter import sample
 
 from dpipe.torch import load_model_state, get_device
-
+from dpipe.itertools import pam, squeeze_first
 
 def load_model_state_cv3_wise(architecture, baseline_exp_path):
     val_path = os.path.abspath('.')
@@ -19,12 +23,8 @@ def load_model_state_cv3_wise(architecture, baseline_exp_path):
     load_model_state(architecture, path=path_to_pretrained_model)
 
 
-def load_model_state_fold_wise(architecture, baseline_exp_path, n_folds=6, modify_state_fn=None, n_first_exclude=0):
-    val_path = os.path.abspath('.')
-    exp = val_path.split('/')[-1]
-    n_val = int(exp.split('_')[-1]) + n_first_exclude
-    path_to_pretrained_model = os.path.join(baseline_exp_path, f'experiment_{n_val // (n_folds - 1)}', 'model.pth')
-    load_model_state(architecture, path=path_to_pretrained_model, modify_state_fn=modify_state_fn)
+def load_model_state_fold_wise(architecture, baseline_exp_path,modify_state_fn=None):
+    load_model_state(architecture, path=baseline_exp_path, modify_state_fn=modify_state_fn)
 
 
 def modify_state_fn_spottune(current_state, state_to_load, init_random=False):
@@ -66,7 +66,10 @@ def freeze_model(model, exclude_layers=('inconv', )):
                 requires_grad = True
         param.requires_grad = requires_grad
 
-
+def none_func(*args,**kwargs):
+    return None
+def empty_dict_func(*args,**kwargs):
+    return {0:None}
 def freeze_model_spottune(model):
     for name, param in model.named_parameters():
         if 'freezed' in name:
@@ -79,3 +82,43 @@ def freeze_model_spottune(model):
 def unfreeze_model(model):
     for params in model.parameters():
         params.requires_grad = True
+
+
+def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
+    random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16):
+    source_ids = ids[:-2]
+    target_ids = ids[-2:]
+    random.shuffle(source_ids)
+    ids = source_ids+target_ids
+    while True:
+        print('ids',len(ids))
+        for step_counter,id_ in enumerate(sample(ids, weights, random_state)):
+
+            if step_counter == batches_per_epoch*batch_size:
+                break
+            yield squeeze_first(tuple(pam(loaders, id_)))
+        if len(ids)>2:
+            ids.pop(0)
+        if len(ids)>2 and random.random() < 0.5:
+            ids.pop(0)
+
+
+def load_by_gradual_id2(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
+                       random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16):
+    source_ids = ids[:-2]
+    target_ids = ids[-2:]
+    source_iter = sample(source_ids, weights, random_state)
+    target_iter = sample(target_ids, weights, random_state)
+    epoch = 0
+    while True:
+
+        for _ in range(batches_per_epoch):
+            from_target = min(epoch//3,batch_size)
+            from_source = batch_size - from_target
+            print(f'some info from load epoch = {epoch} from source = {from_source} from target  = {from_target}')
+
+            for _ in range(from_target):
+                yield squeeze_first(tuple(pam(loaders, next(target_iter))))
+            for _ in range(from_source):
+                yield squeeze_first(tuple(pam(loaders, next(source_iter))))
+        epoch+=1
