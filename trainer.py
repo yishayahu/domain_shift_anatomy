@@ -11,7 +11,8 @@ from functools import partial
 
 import yaml
 from dpipe.config import if_missing, lock_dir, run
-from dpipe.layout import Flat
+from dpipe.io import load
+
 from dpipe.train import train, Checkpoints, Policy
 from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
@@ -58,6 +59,12 @@ class Config:
 
     def second_round(self):
         self.parse(self._second_round)
+
+def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
+    sp_dims_2d = (-2, -1)
+    center = sample_center_uniformly(segm_slc.shape, y_patch_size, sp_dims_2d)
+    x, y = extract_patch((image_slc, segm_slc, center), x_patch_size, y_patch_size, spatial_dims=sp_dims_2d)
+    return x, y
 if __name__ == '__main__':
     cli = argparse.ArgumentParser()
     cli.add_argument("--exp_name", default='debug')
@@ -84,10 +91,11 @@ if __name__ == '__main__':
     best_test_metrics_path = os.path.join(exp_dir,'best_test_metrics')
     checkpoints_path = os.path.join(exp_dir,'checkpoints')
     data_path = DATA_PATH
-    train_ids = os.path.join(splits_dir,'train_ids.json')
-    test_ids = os.path.join(splits_dir,'test_ids.json')
-    val_ids = os.path.join(splits_dir,'val_ids.json')
-    base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_ckpt.pth')
+    train_ids = load(os.path.join(splits_dir,'train_ids.json'))
+    # todo: add source to gradual
+    test_ids = load(os.path.join(splits_dir,'test_ids.json'))
+    val_ids = load(os.path.join(splits_dir,'val_ids.json'))
+    base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model.pth')
 
     ## training params
     freeze_func = cfg.FREEZE_FUNC
@@ -100,7 +108,7 @@ if __name__ == '__main__':
     project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
 
 
-    if opts.exp_namem == 'debug':
+    if opts.exp_name == 'debug':
         print('debug mode')
         batches_per_epoch = 2
         batch_size = 2
@@ -166,11 +174,7 @@ if __name__ == '__main__':
     ids_sampling_weights = None
     slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48 todo: change to be configable
 
-    def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
-        sp_dims_2d = (-2, -1)
-        center = sample_center_uniformly(segm_slc.shape, y_patch_size, sp_dims_2d)
-        x, y = extract_patch((image_slc, segm_slc, center), x_patch_size, y_patch_size, spatial_dims=sp_dims_2d)
-        return x, y
+
 
 
     x_patch_size = y_patch_size = np.array([256, 256])
