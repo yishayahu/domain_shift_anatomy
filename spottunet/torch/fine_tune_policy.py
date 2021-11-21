@@ -16,7 +16,7 @@ class FineTunePolicy(Policy):
         self.layers = {n1:[] for n1 in self.layers}
         self.architecture = architecture
         self.optimizer = optimizer
-        self.optimizer.param_groups[0]['params'] = []
+        self.optimizer.param_groups[0]['lr'] = 1e-10
         for n1,m1 in architecture.named_modules():
             if isinstance(m1, nn.Conv2d) or isinstance(m1,nn.ConvTranspose2d):
                  for n2 in self.layers.keys():
@@ -26,14 +26,9 @@ class FineTunePolicy(Policy):
                 for n2 in self.layers.keys():
                     if n2 in n1:
                         self.layers[n2].append(m1)
-                # continue
-                # self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
-
-
-
         self.return_to_ckpt = return_to_ckpt
-
-        self.unfreezed_layers = {}
+        self.layer_per_group = {}
+        # self.unfreezed_layers = {}
 
         self.grad_per_layer = torch.zeros((len(self.layers),3))
         self.last_best = [0,0]
@@ -42,12 +37,12 @@ class FineTunePolicy(Policy):
         for layer_index,(n1,m_list) in enumerate(self.layers.items()):
             self.index_to_layer[layer_index] = n1
             for m1 in m_list:
-                if 'init_path.1' in n1:
-                    self.unfreezed_layers[layer_index] = n1
-                    self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
+                # if 'init_path.1' in n1:
+                #     self.unfreezed_layers[layer_index] = n1
+                #     self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
                 if 'init_path.0' in n1:
                     m1.register_backward_hook(self.collect_grads())
-        print(f'current unfreeze {self.unfreezed_layers}')
+        # print(f'current unfreeze {self.unfreezed_layers}')
 
     def epoch_started(self, epoch: int):
         if self.return_to_ckpt:
@@ -57,26 +52,56 @@ class FineTunePolicy(Policy):
 
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
         if self.detect_plateau(metrics):
-            layer_index = int(torch.argmax(self.grad_per_layer[:,0]))
-            layer_to_unfreeze_name = self.index_to_layer[layer_index]
-            layer_to_unfreeze_list = self.layers[layer_to_unfreeze_name]
-            print(f'unfreezing {layer_to_unfreeze_name}')
-            self.unfreezed_layers[layer_index] = layer_to_unfreeze_name
-            print(f'current unfreeze {self.unfreezed_layers}')
+            for i in range(3):
+                layer_index = int(torch.argmax(self.grad_per_layer[:,0]))
+                self.grad_per_layer[layer_index,0] = 0
+                layer_to_unfreeze_name = self.index_to_layer[layer_index]
+                layer_to_unfreeze_list = self.layers[layer_to_unfreeze_name]
+                self.transfer_params(layer_to_unfreeze_name,layer_to_unfreeze_list)
+                print(f'unfreezing {layer_to_unfreeze_name}')
+            print(self.grad_per_layer)
             self.last_best = [0,0]
             if self.return_to_ckpt:
                 self.architecture.load_state_dict(self.ckpt[0])
                 self.ckpt = [None,None]
-            for m1 in layer_to_unfreeze_list:
-                self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
+
 
     def train_step_finished(self, epoch: int, iteration: int, loss: Any):
         for layer_index in range(len(self.layers)):
-            if layer_index not in self.unfreezed_layers:
-                if self.grad_per_layer[layer_index][2] != 0:
-                    self.grad_per_layer[layer_index][0] += self.grad_per_layer[layer_index][1] / self.grad_per_layer[layer_index][2]
-                    self.grad_per_layer[layer_index][1] = 0
-                    self.grad_per_layer[layer_index][2] = 0
+            # if layer_index not in self.unfreezed_layers:
+            if self.grad_per_layer[layer_index][2] != 0:
+                self.grad_per_layer[layer_index][0] += self.grad_per_layer[layer_index][1] / self.grad_per_layer[layer_index][2]
+                self.grad_per_layer[layer_index][1] = 0
+                self.grad_per_layer[layer_index][2] = 0
+
+    @staticmethod
+    def index_in_optimizer(p1, group):
+        for i,param in enumerate(group['params']):
+            if param is p1:
+                return i
+        assert False
+
+    def transfer_params(self,name1,m_list):
+        factor = 10
+        source_group_lr = self.layer_per_group.get(name1,1e-10)
+        current_group_source = [x for x in self.optimizer.param_groups if x['lr'] == source_group_lr]
+        current_group_dest = [x for x in self.optimizer.param_groups if x['lr'] == source_group_lr*factor]
+        assert len(current_group_source) == 1
+        current_group_source = current_group_source[0]
+        if len(current_group_dest) == 0:
+            self.optimizer.param_groups.append({k:v for k,v in self.optimizer.param_groups[0].items() if k != 'params'})
+            self.optimizer.param_groups[-1]['params'] = []
+            self.optimizer.param_groups[-1]['lr'] = source_group_lr * factor
+            current_group_dest = self.optimizer.param_groups[-1]
+        else:
+            current_group_dest = current_group_dest[0]
+        for m1 in m_list:
+            ind = self.index_in_optimizer(m1.weight,current_group_source)
+            current_group_dest['params'].append(current_group_source['params'].pop(ind))
+            if m1.bias is not None:
+                ind = self.index_in_optimizer(m1.bias,current_group_source)
+                current_group_dest['params'].append(current_group_source['params'].pop(ind))
+        self.layer_per_group[name1] = source_group_lr*factor
 
 
 
@@ -96,18 +121,18 @@ class FineTunePolicy(Policy):
     def collect_grads(self):
         def hook(_,grads,___):
             for layer_index in range(len(self.layers)):
-                if layer_index not in self.unfreezed_layers:
-                    m1_list = self.layers[self.index_to_layer[layer_index]]
-                    for m1 in m1_list:
-                        if m1.weight.grad is not None:
-                            self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu()))
-                        else:
-                            assert 'init_path.0' in self.index_to_layer[layer_index]
-                            self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(grads[1].cpu()))
-                        self.grad_per_layer[layer_index][2] += m1.weight.numel()
-                        if m1.bias is not None:
-                            self.grad_per_layer[layer_index][1] +=  torch.sum(torch.abs(m1.bias.grad.cpu()))
-                            self.grad_per_layer[layer_index][2] += m1.bias.numel()
+                # if layer_index not in self.unfreezed_layers:
+                m1_list = self.layers[self.index_to_layer[layer_index]]
+                for m1 in m1_list:
+                    if m1.weight.grad is not None:
+                        self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu()))
+                    else:
+                        assert 'init_path.0' in self.index_to_layer[layer_index]
+                        self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(grads[1].cpu()))
+                    self.grad_per_layer[layer_index][2] += m1.weight.numel()
+                    if m1.bias is not None:
+                        self.grad_per_layer[layer_index][1] +=  torch.sum(torch.abs(m1.bias.grad.cpu()))
+                        self.grad_per_layer[layer_index][2] += m1.bias.numel()
         return hook
 
 

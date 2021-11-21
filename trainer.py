@@ -89,7 +89,6 @@ if __name__ == '__main__':
     ## define paths
     exp_dir = os.path.join(opts.base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
     Path(exp_dir).mkdir(parents=True,exist_ok=True)
-    lock_dir(exp_dir)
     splits_dir =  os.path.join(opts.base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
     log_path = os.path.join(exp_dir,'train_logs')
     saved_model_path = os.path.join(exp_dir,'model.pth')
@@ -123,6 +122,8 @@ if __name__ == '__main__':
         batches_per_epoch = 2
         batch_size = 2
         project = 'spot3'
+    else:
+        lock_dir(exp_dir)
 
 
     print(f'running {opts.exp_name}')
