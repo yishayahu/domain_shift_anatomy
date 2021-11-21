@@ -16,13 +16,13 @@ class SpottuneUNet2D(nn.Module):
 
         # policy tracking (start)
 
-        self.policy_shape = 32
+        self.policy_shape = 33
         self.policy_tracker = torch.zeros(self.policy_shape)
         self.policy_tracker_temp = torch.zeros(self.policy_shape)
         self.iter_tracker = 0
         self.iter_tracker_temp = 0
 
-        self.parallelized_blocks = (nn.Conv2d, nn.ConvTranspose2d, ResBlock, PreActivationND)
+        self.parallelized_blocks = (nn.Conv2d, nn.ConvTranspose2d, ResBlock, PreActivationND,nn.BatchNorm2d)
         self.val_flag = False
         self.val_policy_tracker = torch.zeros(self.policy_shape)
         self.val_iter_tracker = 0

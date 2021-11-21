@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
 
     if spot:
-        architecture_policy = resnet(num_class=64)
+        architecture_policy = resnet(num_class=66)
         architecture_policy.to(device)
         temperature = 0.1
         use_gumbel_inference = False
