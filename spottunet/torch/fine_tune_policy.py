@@ -46,8 +46,7 @@ class FineTunePolicy(Policy):
                     self.unfreezed_layers[layer_index] = n1
                     self.optimizer.param_groups[0]['params'].extend(list(m1.parameters()))
                 if 'init_path.0' in n1:
-                    self.unfreezed_layers[layer_index] = n1
-                    m1.register_full_backward_hook(self.collect_grads())
+                    m1.register_backward_hook(self.collect_grads())
         print(f'current unfreeze {self.unfreezed_layers}')
 
     def epoch_started(self, epoch: int):
@@ -95,12 +94,16 @@ class FineTunePolicy(Policy):
 
 
     def collect_grads(self):
-        def hook(_,__,___):
+        def hook(_,grads,___):
             for layer_index in range(len(self.layers)):
                 if layer_index not in self.unfreezed_layers:
                     m1_list = self.layers[self.index_to_layer[layer_index]]
                     for m1 in m1_list:
-                        self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu()))
+                        if m1.weight.grad is not None:
+                            self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(m1.weight.grad.cpu()))
+                        else:
+                            assert 'init_path.0' in self.index_to_layer[layer_index]
+                            self.grad_per_layer[layer_index][1] += torch.sum(torch.abs(grads[1].cpu()))
                         self.grad_per_layer[layer_index][2] += m1.weight.numel()
                         if m1.bias is not None:
                             self.grad_per_layer[layer_index][1] +=  torch.sum(torch.abs(m1.bias.grad.cpu()))
