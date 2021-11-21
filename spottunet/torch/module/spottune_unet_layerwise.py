@@ -16,13 +16,13 @@ class SpottuneUNet2D(nn.Module):
 
         # policy tracking (start)
 
-        self.policy_shape = 33
+        self.policy_shape = 32
         self.policy_tracker = torch.zeros(self.policy_shape)
         self.policy_tracker_temp = torch.zeros(self.policy_shape)
         self.iter_tracker = 0
         self.iter_tracker_temp = 0
 
-        self.parallelized_blocks = (nn.Conv2d, nn.ConvTranspose2d, ResBlock, PreActivationND,nn.BatchNorm2d)
+        self.parallelized_blocks = (nn.Conv2d, nn.ConvTranspose2d, ResBlock, PreActivationND)
         self.val_flag = False
         self.val_policy_tracker = torch.zeros(self.policy_shape)
         self.val_iter_tracker = 0
@@ -103,8 +103,11 @@ class SpottuneUNet2D(nn.Module):
     def forward_block(self, x, block_ft, block_fr, action_mask, i):
 
         for layer_ft, layer_fr in zip(block_ft, block_fr):
-            policy_current = action_mask[..., i]
-            x = layer_ft(x) * (1 - policy_current) + layer_fr(x) * policy_current
+            if type(layer_ft) == nn.BatchNorm2d:
+                x = layer_fr(x)
+            else:
+                policy_current = action_mask[..., i]
+                x = layer_ft(x) * (1 - policy_current) + layer_fr(x) * policy_current
             if isinstance(layer_ft, self.parallelized_blocks):
                 i += 1
         return x, i
