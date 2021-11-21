@@ -59,7 +59,7 @@ class FineTunePolicy(Policy):
                 layer_to_unfreeze_list = self.layers[layer_to_unfreeze_name]
                 self.transfer_params(layer_to_unfreeze_name,layer_to_unfreeze_list)
                 print(f'unfreezing {layer_to_unfreeze_name}')
-            print(self.grad_per_layer)
+            print(self.layer_per_group)
             self.last_best = [0,0]
             if self.return_to_ckpt:
                 self.architecture.load_state_dict(self.ckpt[0])
