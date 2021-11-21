@@ -19,7 +19,7 @@ def gumbel_softmax_sample(logits, temperature, use_gumbel=True):
     return F.softmax(y / temperature, dim=-1)
 
 
-def gumbel_softmax(logits,soft, use_gumbel=True, temperature=5,):
+def gumbel_softmax(logits,soft, use_gumbel=True, temperature=5):
     """
     input: [*, n_class]
     return: [*, n_class] an one-hot vector
