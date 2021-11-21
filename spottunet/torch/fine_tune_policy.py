@@ -52,13 +52,20 @@ class FineTunePolicy(Policy):
 
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
         if self.detect_plateau(metrics):
-            for i in range(3):
+            counter = 0
+            while True:
                 layer_index = int(torch.argmax(self.grad_per_layer[:,0]))
                 self.grad_per_layer[layer_index,0] = 0
                 layer_to_unfreeze_name = self.index_to_layer[layer_index]
                 layer_to_unfreeze_list = self.layers[layer_to_unfreeze_name]
-                self.transfer_params(layer_to_unfreeze_name,layer_to_unfreeze_list)
-                print(f'unfreezing {layer_to_unfreeze_name}')
+                sucsess = self.transfer_params(layer_to_unfreeze_name,layer_to_unfreeze_list)
+                if sucsess:
+                    counter+=1
+                    print(f'unfreezing {layer_to_unfreeze_name}')
+                    if counter==3:
+                        break
+                else:
+                    print(f'unfreezing {layer_to_unfreeze_name} failed')
             print(self.layer_per_group)
             self.last_best = [0,0]
             if self.return_to_ckpt:
@@ -84,6 +91,8 @@ class FineTunePolicy(Policy):
     def transfer_params(self,name1,m_list):
         factor = 10
         source_group_lr = self.layer_per_group.get(name1,1e-10)
+        if source_group_lr > 1e-4:
+            return False
         current_group_source = [x for x in self.optimizer.param_groups if x['lr'] == source_group_lr]
         current_group_dest = [x for x in self.optimizer.param_groups if x['lr'] == source_group_lr*factor]
         assert len(current_group_source) == 1
@@ -102,7 +111,7 @@ class FineTunePolicy(Policy):
                 ind = self.index_in_optimizer(m1.bias,current_group_source)
                 current_group_dest['params'].append(current_group_source['params'].pop(ind))
         self.layer_per_group[name1] = source_group_lr*factor
-
+        return True
 
 
     def detect_plateau(self,metrics):
