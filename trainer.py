@@ -21,7 +21,8 @@ from spottunet.torch.module.agent_net import resnet
 from spottunet.torch.checkpointer import CheckpointsWithBest
 from spottunet.torch.module.spottune_unet_layerwise import SpottuneUNet2D
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
-from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist
+from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist, \
+    PreDefinedFineTunePolicy
 from spottunet.torch.losses import FineRegularizedLoss
 from spottunet.torch.model import train_step, inference_step_spottune, train_step_spottune
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
