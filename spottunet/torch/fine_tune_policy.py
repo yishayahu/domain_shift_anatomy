@@ -51,10 +51,12 @@ class PreDefinedFineTunePolicy(Policy):
         assert False
 
     def epoch_finished(self, epoch: int, train_losses: Sequence, metrics: dict = None, policies: dict = None):
-        if self.detect_plateau(metrics):
+        if self.detect_plateau(metrics) and len(self.layers_to_unfreeze) > 0:
             self.last_best = [0,0]
             self.transfer_params(self.layers_to_unfreeze.pop(0))
             print(f'current unfreeze {self.unfreezed_layers}')
+        if epoch == 100:
+            self.optimizer.param_groups[1]['lr'] = 1e-4
 
     def detect_plateau(self,metrics):
         curr_metric = metrics['sdice_score']
