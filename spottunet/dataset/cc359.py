@@ -115,6 +115,8 @@ class CC359Ds(torch.utils.data.Dataset):
         self.patch_func = patch_func
         path_to_i_to_id = os.path.join(exp_dir,'i_to_id.p')
         path_to_len_ds = os.path.join(exp_dir,'len_ds.p')
+        self.target_indexes = []
+        self.source_indexes = []
         if os.path.exists(path_to_i_to_id):
             assert os.path.exists(path_to_len_ds)
             self.i_to_id = pickle.load(open(path_to_i_to_id,'rb'))
@@ -122,9 +124,16 @@ class CC359Ds(torch.utils.data.Dataset):
         else:
             for id1 in tqdm(ids,desc='calculating data_len'):
                 self.i_to_id.append([self.len_ds,id1])
-                self.len_ds+= self.image_loader(id1).shape[-1]
+                domain = int(np.argmax(self.domain_loader(id1)) == self.target_domain)
+                new_len_ds = self.len_ds + self.image_loader(id1).shape[-1]
+                if domain > 0:
+                    self.target_indexes += list(range(self.len_ds, new_len_ds))
+                else:
+                    self.source_indexes += list(range(self.len_ds, new_len_ds))
+                self.len_ds = new_len_ds
         pickle.dump(self.i_to_id,open(path_to_i_to_id,'wb'))
         pickle.dump(self.len_ds,open(path_to_len_ds,'wb'))
+
 
 
     def __getitem__(self, item):
@@ -144,3 +153,4 @@ class CC359Ds(torch.utils.data.Dataset):
 
     def __len__(self):
         return self.len_ds
+

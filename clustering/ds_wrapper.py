@@ -23,10 +23,12 @@ class DsWrapper(torch.utils.data.Dataset):
 
 
         #######
-        all_indexes = list(range(len(self.ds)))
-        random.shuffle(all_indexes)
-        train_indexes = all_indexes[:int(len(self.ds)*0.8)]
-        clustering_indexes = all_indexes[int(len(self.ds)*0.8):]
+        source_indexes = self.ds.source_indexes
+
+        random.shuffle(source_indexes)
+        train_indexes = source_indexes[:int(len(self.ds)*0.8)]
+        clustering_indexes = source_indexes[int(len(self.ds)*0.8):]+  self.ds.target_indexes
+
 
         regular_sampler = RegularSampler(data_source=self, train_indexes=train_indexes,
                                          clustering_indexes=clustering_indexes,warmup_epochs=warmups)
