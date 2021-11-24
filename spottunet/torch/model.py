@@ -11,6 +11,7 @@ from dpipe.im.utils import identity, dmap
 from dpipe.torch.utils import *
 from dpipe.torch.model import *
 
+from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.functional import gumbel_softmax
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2',
@@ -21,7 +22,7 @@ prev_step = -1
 
 
 def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None, reference_architecture=None, train_step_logger=None, **optimizer_params):
+               alpha_l2sp=None, reference_architecture=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None, **optimizer_params):
     architecture.train()
     if n_targets >= 0:
         n_inputs = len(inputs) - n_targets
@@ -32,6 +33,11 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets = inputs[:n_inputs], inputs[n_inputs:]
     loss = criterion(architecture(*inputs), *targets)
+    if use_clustering_curriculum:
+        if type(batch_iter_step.dataset) == DsWrapper:
+            loss = batch_iter_step.dataset.send_loss(loss,batch_iter_step)
+        else:
+            loss = torch.mean(loss)
     global prev_step
     if train_step_logger is not None and train_step_logger._experiment.step > prev_step:
         prev_step = train_step_logger._experiment.step

@@ -1,8 +1,16 @@
-import numpy as np
+import os
+import pickle
 
+import numpy as np
+import json
+
+import numpy as np
+import torch
+
+from dpipe.im.shape_ops import zoom
 from dpipe.dataset.segmentation import SegmentationFromCSV
 from dpipe.dataset.wrappers import Proxy
-from dpipe.im.shape_ops import zoom
+from tqdm import tqdm
 
 
 class CC359(SegmentationFromCSV):
@@ -90,3 +98,45 @@ def scale_mri(image: np.ndarray, q_min: int = 1, q_max: int = 99) -> np.ndarray:
     image -= np.min(image)
     image /= np.max(image)
     return np.float32(image)
+
+
+
+class CC359Ds(torch.utils.data.Dataset):
+    def __init__(self,ids,ds,start,patch_func,exp_dir,source_domain,target_domain):
+        self.image_loader = ds.load_image
+        self.seg_loader = ds.load_segm
+        self.domain_loader = ds.load_domain_label
+        self.source_domain = source_domain
+        self.target_domain = target_domain
+        self.len_ds = 0
+        self.i_to_id = []
+        self.start = start # todo: use
+        self.patch_func = patch_func
+        path_to_i_to_id = os.path.join(exp_dir,'i_to_id.p')
+        path_to_len_ds = os.path.join(exp_dir,'len_ds.p')
+        if os.path.exists(path_to_i_to_id):
+            assert os.path.exists(path_to_len_ds)
+            self.i_to_id = pickle.load(open(path_to_i_to_id,'rb'))
+            self.len_ds = pickle.load(open(path_to_len_ds,'rb'))
+        else:
+            for id1 in tqdm(ids,desc='calculating data_len'):
+                self.i_to_id.append([self.len_ds,id1])
+                self.len_ds+= self.image_loader(id1).shape[-1]
+        pickle.dump(self.i_to_id,open(path_to_i_to_id,'wb'))
+        pickle.dump(self.len_ds,open(path_to_len_ds,'wb'))
+
+
+    def __getitem__(self, item):
+        for (i,id1),(next_i,_) in zip(self.i_to_id,self.i_to_id[1:]+[(self.len_ds,None)]):
+            if i <= item < next_i:
+                img_slc = self.image_loader(id1)[...,item-i]
+                seg_slc = self.seg_loader(id1)[...,item-i]
+                img_slc,seg_slc = self.patch_func(img_slc,seg_slc,256,256)
+                domain = int(np.argmax(self.domain_loader(id1)) == self.target_domain)
+                if domain > 0:
+                    assert int(np.argmax(self.domain_loader(id1)) == self.target_domain) == 0
+                return img_slc,seg_slc,domain
+
+
+    def __len__(self):
+        return self.len_ds

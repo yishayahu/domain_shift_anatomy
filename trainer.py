@@ -16,6 +16,9 @@ from dpipe.io import load
 from dpipe.train import train, Checkpoints, Policy
 from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
+
+from clustering.dataloader_wrapper import DataLoaderWrapper
+from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
@@ -31,7 +34,7 @@ from spottunet.metric import evaluate_individual_metrics_probably_with_ids, comp
     compute_metrics_probably_with_ids_spottune
 from spottunet.split import one2one
 from dpipe.dataset.wrappers import apply, cache_methods
-from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri
+from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri, CC359Ds
 from spottunet.paths import DATA_PATH, BASELINE_PATH
 from dpipe.im.metrics import dice_score
 from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch
@@ -113,6 +116,7 @@ if __name__ == '__main__':
 
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     spot = getattr(cfg,'SPOT',False)
+    clustering = getattr(cfg,'CLUSTERING',False)
     batch_size = 16
     lr_init = 1e-3
     project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
@@ -123,6 +127,8 @@ if __name__ == '__main__':
         batches_per_epoch = 2
         batch_size = 2
         project = 'spot3'
+        if len(train_ids) > 2:
+            train_ids = train_ids[-4:]
     else:
         lock_dir(exp_dir)
 
@@ -134,6 +140,7 @@ if __name__ == '__main__':
 
     preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
     dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
+
     seed = 0xBadCafe
 
 
@@ -222,7 +229,7 @@ if __name__ == '__main__':
         lr_policy = None
         architecture_policy = None
         optimizer_policy = None
-        train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger)
+        train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger,use_clustering_curriculum=clustering)
         if lr:
             train_kwargs['lr'] = lr
 
@@ -241,17 +248,27 @@ if __name__ == '__main__':
 
 
 
-
     x_patch_size = y_patch_size = np.array([256, 256])
-    batch_iter = Infinite(
-        sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
-                          weights=ids_sampling_weights, random_state=seed),
-        unpack_args(get_random_slice, interval=slice_sampling_interval),
-        unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
-        multiply(prepend_dims),
-        multiply(np.float32),
-        batch_size=batch_size, batches_per_epoch=batches_per_epoch
-    )
+    if clustering:
+
+        train_dataset = DsWrapper(model=architecture,ids=train_ids,ds=dataset, dataset_creator=CC359Ds,
+                                  n_clusters=cfg.N_CLUSTERS, feature_layer_name='bottleneck.3',warmups=cfg.WARMUPS,exp_name=opts.exp_name,decrease_center=cfg.DECREASE_CENTER,patch_func=get_random_patch_2d,exp_dir=exp_dir,source_domain=opts.source,target_domain=opts.target)
+        data_loader_func = DataLoaderWrapper(torch.utils.data.DataLoader).recreate
+        batch_iter = data_loader_func(
+            dataset =train_dataset, batch_size=batch_size,
+            num_workers=0, pin_memory=True, sampler=train_dataset.current_sampler)
+        train_kwargs['batch_iter_step'] = batch_iter
+
+    else:
+        batch_iter = Infinite(
+            sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
+                              weights=ids_sampling_weights, random_state=seed),
+            unpack_args(get_random_slice, interval=slice_sampling_interval),
+            unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
+            multiply(prepend_dims),
+            multiply(np.float32),
+            batch_size=batch_size, batches_per_epoch=batches_per_epoch
+        )
     train_model = partial(train,
         train_step=train_step_func,
         batch_iter=batch_iter,
