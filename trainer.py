@@ -86,14 +86,24 @@ if __name__ == '__main__':
     cli.add_argument("--base_res_dir", default='/home/dsi/shaya/spottune_results/')
     cli.add_argument("--base_split_dir", default='/home/dsi/shaya/data_splits/')
     cli.add_argument("--ts_size", default=2)
+    cli.add_argument("--train_only_source", action='store_true')
     opts = cli.parse_args()
     cfg_path = open(f"configs/Shaya_exp/{opts.config}.yml", "r")
     cfg = Config(yaml.safe_load(cfg_path))
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
-    exp_dir = os.path.join(opts.base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
+
+
+
+    if opts.train_only_source:
+        exp_dir = os.path.join(opts.base_res_dir,f'source_{opts.source}',opts.exp_name)
+        splits_dir =  os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}')
+        opts.target = None
+        opts.ts_size = None
+    else:
+        exp_dir = os.path.join(opts.base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
+        splits_dir =  os.path.join(opts.base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
     Path(exp_dir).mkdir(parents=True,exist_ok=True)
-    splits_dir =  os.path.join(opts.base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
     log_path = os.path.join(exp_dir,'train_logs')
     saved_model_path = os.path.join(exp_dir,'model.pth')
     saved_model_path_policy = os.path.join(exp_dir,'model_policy.pth')
@@ -102,6 +112,7 @@ if __name__ == '__main__':
     best_test_metrics_path = os.path.join(exp_dir,'best_test_metrics')
     checkpoints_path = os.path.join(exp_dir,'checkpoints')
     data_path = DATA_PATH
+
     train_ids = load(os.path.join(splits_dir,'train_ids.json'))
     if getattr(cfg,'ADD_SOURCE_IDS',False):
         train_ids = load(os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','train_ids.json')) + train_ids
@@ -120,8 +131,10 @@ if __name__ == '__main__':
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     batch_size = 16
     lr_init = 1e-3
-    project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
-
+    if opts.train_only_source:
+        project = f'spot_s{opts.source}'
+    else:
+        project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
 
     if opts.exp_name == 'debug':
         print('debug mode')
@@ -156,7 +169,8 @@ if __name__ == '__main__':
     architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
-    load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
+    if not opts.train_only_source:
+        load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
 
     logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name,config=cfg_path)
 
@@ -169,7 +183,7 @@ if __name__ == '__main__':
     if type(lr) == partial:
         lr = lr()
 
-    if spot:
+    if spot or opts.train_only_source:
         reference_architecture = None
     else:
         reference_architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
