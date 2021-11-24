@@ -44,9 +44,7 @@ class ClusteredSampler(torch.utils.data.Sampler):
             max_idx = np.argmax(new_losses)
             self.hierarchy.append(max_idx)
             new_losses[max_idx] = -1
-        self.hierarchy = [-1] + self.hierarchy
-        print(f"hierarchy is {self.hierarchy}")
-        assert len(self.hierarchy) == self.n_cluster + 1
+
         cluster_to_domain_dict = [[0,0] for _ in self.hierarchy]
         for i in tqdm(range(len(self.ds)),desc='calculating distribuitns'):
             clus = self.index_to_cluster[i]
@@ -54,6 +52,9 @@ class ClusteredSampler(torch.utils.data.Sampler):
             cluster_to_domain_dict[clus][domain] +=1
         for i,l1 in enumerate(cluster_to_domain_dict):
             print(f'for clus {i} source percenteage is {l1[0] / sum(l1)}')
+        self.hierarchy = [-1] + self.hierarchy
+        print(f"hierarchy is {self.hierarchy}")
+        assert len(self.hierarchy) == self.n_cluster + 1
         # indexes = list(range(len(self.ds)))
         # random.shuffle(indexes)
         # for i in range(200):
