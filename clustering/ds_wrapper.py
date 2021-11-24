@@ -79,7 +79,6 @@ class DsWrapper(torch.utils.data.Dataset):
                 self.losses[self.index_to_cluster[index]].append(torch.mean(loss[i]).item())
             self.new_indexes = []
             loss[loss!=0] = 0
-            self.future_kwargs["transform"] = self.future_transform
             self.ds = self.dataset_creator(**self.future_kwargs)
             assert len(self.index_to_cluster) == len(self.ds)
             self.current_sampler = ClusteredSampler(data_source=self.ds, index_to_cluster=self.index_to_cluster,
