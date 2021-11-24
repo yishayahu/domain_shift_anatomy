@@ -69,14 +69,14 @@ class DsWrapper(torch.utils.data.Dataset):
             self.arrays = []
             self.indexes = []
             for i, index in enumerate(self.new_indexes):
-                self.losses[self.index_to_cluster[index]].append(loss[i].item())
+                self.losses[self.index_to_cluster[index]].append(torch.mean(loss[i]).item())
             self.new_indexes = []
             loss[loss!=0] = 0
 
         elif self.current_sampler.get_clustering_flag() == "done":
 
             for i, index in enumerate(self.new_indexes):
-                self.losses[self.index_to_cluster[index]].append(loss[i].item())
+                self.losses[self.index_to_cluster[index]].append(torch.mean(loss[i]).item())
             self.new_indexes = []
             loss[loss!=0] = 0
             self.future_kwargs["transform"] = self.future_transform
