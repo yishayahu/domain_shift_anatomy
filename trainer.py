@@ -92,9 +92,6 @@ if __name__ == '__main__':
     cfg = Config(yaml.safe_load(cfg_path))
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
-
-
-
     if opts.train_only_source:
         exp_dir = os.path.join(opts.base_res_dir,f'source_{opts.source}',opts.exp_name)
         splits_dir =  os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}')

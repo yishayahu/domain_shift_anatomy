@@ -39,10 +39,8 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         else:
             loss = torch.mean(loss)
     global prev_step
-    if train_step_logger is not None and train_step_logger._experiment.step > prev_step:
+    if train_step_logger is not None and train_step_logger._experiment.step > prev_step and reference_architecture is not None:
         prev_step = train_step_logger._experiment.step
-        if reference_architecture is None:
-            raise ValueError('`reference_architecture` should be provided for wandb')
         dist_pet_layer = []
         param_size_per_layer = []
         normalize_dist_per_layer = []
