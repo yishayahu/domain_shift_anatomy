@@ -8,5 +8,5 @@ CLUSTERING: True
 SECOND_ROUND:
   CRITERION:
     FUNC: weighted_cross_entropy_with_logits
-    reduce: None
+    reduce:
 
