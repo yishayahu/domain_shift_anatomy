@@ -88,7 +88,7 @@ class DsWrapper(torch.utils.data.Dataset):
             self.new_indexes = []
 
         else:
-            if len(self.arrays)>=100:
+            if len(self.arrays)>=1000:
                 self.clustering_algorithm.partial_fit(self.arrays)
                 for (index, label) in zip(self.indexes, self.clustering_algorithm.predict(self.arrays)):
                     self.index_to_cluster[index] = label
