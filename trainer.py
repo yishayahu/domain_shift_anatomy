@@ -2,7 +2,7 @@ import argparse
 import os
 import shutil
 from pathlib import Path
-
+from torch.optim import Adam,SGD
 import dpipe.commands as commands
 import numpy as np
 import torch
@@ -117,6 +117,7 @@ if __name__ == '__main__':
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     spot = getattr(cfg,'SPOT',False)
     clustering = getattr(cfg,'CLUSTERING',False)
+    optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     batch_size = 16
     lr_init = 1e-3
     project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
@@ -159,11 +160,9 @@ if __name__ == '__main__':
 
     logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name,config=cfg_path)
 
-    optimizer = torch.optim.SGD(
+    optimizer = optimizer_creator(
         architecture.parameters(),
         lr=lr_init,
-        momentum=0.9,
-        nesterov=True,
         weight_decay=0
     )
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
@@ -176,6 +175,7 @@ if __name__ == '__main__':
         reference_architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
+
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
