@@ -42,12 +42,12 @@ class DsWrapper(torch.utils.data.Dataset):
         self.indexes = []
         self.item_to_domain = {}
         def feature_layer_hook(model, _, output):
-            output = output[0]
             if model.training and type(self.current_sampler) == RegularSampler:
+                output = torch.mean(output,dim=1).flatten(1)
                 assert output.shape[0] == len(self.new_indexes)
 
                 for i in range(output.shape[0]):
-                    self.arrays.append(output[i].cpu().detach().flatten().numpy())
+                    self.arrays.append(output[i].cpu().detach().numpy())
                     self.indexes.append(self.new_indexes[i])
 
             else:

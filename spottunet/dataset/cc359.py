@@ -134,8 +134,8 @@ class CC359Ds(torch.utils.data.Dataset):
                 img_slc,seg_slc = self.patch_func(img_slc,seg_slc,256,256)
                 domain = int(np.argmax(self.domain_loader(id1)) == self.target_domain)
                 if domain > 0:
-                    assert int(np.argmax(self.domain_loader(id1)) == self.target_domain) == 0
-                return img_slc,seg_slc,domain
+                    assert int(np.argmax(self.domain_loader(id1)) == self.source_domain) == 0
+                return np.expand_dims(img_slc, axis=0),np.expand_dims(seg_slc, axis=0),domain
 
 
     def __len__(self):
