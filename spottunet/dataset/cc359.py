@@ -102,12 +102,13 @@ def scale_mri(image: np.ndarray, q_min: int = 1, q_max: int = 99) -> np.ndarray:
 
 
 class CC359Ds(torch.utils.data.Dataset):
-    def __init__(self,ids,ds,start,patch_func,exp_dir,source_domain,target_domain):
+    def __init__(self,ids,ds,start,patch_func,exp_dir,source_domain,target_domain,out_domain):
         self.image_loader = ds.load_image
         self.seg_loader = ds.load_segm
         self.domain_loader = ds.load_domain_label
         self.source_domain = source_domain
         self.target_domain = target_domain
+        self.out_domain = out_domain
         self.len_ds = 0
         self.i_to_id = []
         self.start = start # todo: use
@@ -132,10 +133,13 @@ class CC359Ds(torch.utils.data.Dataset):
                 img_slc = self.image_loader(id1)[...,item-i]
                 seg_slc = self.seg_loader(id1)[...,item-i]
                 img_slc,seg_slc = self.patch_func(img_slc,seg_slc,256,256)
+                img_slc,seg_slc = np.expand_dims(img_slc, axis=0),np.expand_dims(seg_slc, axis=0)
+                if not self.out_domain:
+                    return img_slc,seg_slc
                 domain = int(np.argmax(self.domain_loader(id1)) == self.target_domain)
                 if domain > 0:
                     assert int(np.argmax(self.domain_loader(id1)) == self.source_domain) == 0
-                return np.expand_dims(img_slc, axis=0),np.expand_dims(seg_slc, axis=0),domain
+                return img_slc,seg_slc,domain
 
 
     def __len__(self):

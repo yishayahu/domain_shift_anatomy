@@ -11,10 +11,12 @@ class DsWrapper(torch.utils.data.Dataset):
     def __init__(self,model,dataset_creator,n_clusters,feature_layer_name,warmups,exp_name,decrease_center,**kwargs):
 
         #####
+        kwargs['out_domain'] = True
         self.ds = dataset_creator(**kwargs,start=True)
         self.dataset_creator = dataset_creator
         self.future_kwargs = kwargs
         self.future_kwargs['start'] = False
+        self.future_kwargs['out_domain'] = False
         self.exp_name = exp_name
         self.decrease_center= decrease_center
         #####
