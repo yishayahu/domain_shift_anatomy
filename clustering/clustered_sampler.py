@@ -46,12 +46,16 @@ class ClusteredSampler(torch.utils.data.Sampler):
             new_losses[max_idx] = -1
 
         cluster_to_domain_dict = [[0,0] for _ in self.hierarchy]
+        sum_target = 0
         for i in tqdm(range(len(self.ds)),desc='calculating distribuitns'):
             clus = self.index_to_cluster[i]
             domain = item_to_domain[i]
+            if domain > 0:
+                sum_target+=1
             cluster_to_domain_dict[clus][domain] +=1
         for i,l1 in enumerate(cluster_to_domain_dict):
             print(f'for clus {i} source percenteage is {l1[0] / sum(l1)}')
+            print(f'for clus {i} target percenteage is from sum_target is {l1[1] / sum_target}')
         self.hierarchy = [-1] + self.hierarchy
         print(f"hierarchy is {self.hierarchy}")
         assert len(self.hierarchy) == self.n_cluster + 1

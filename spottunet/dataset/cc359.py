@@ -115,12 +115,16 @@ class CC359Ds(torch.utils.data.Dataset):
         self.patch_func = patch_func
         path_to_i_to_id = os.path.join(exp_dir,'i_to_id.p')
         path_to_len_ds = os.path.join(exp_dir,'len_ds.p')
+        path_to_target_indexes = os.path.join(exp_dir,'target_indexes.p')
+        path_to_source_indexes = os.path.join(exp_dir,'source_indexes.p')
         self.target_indexes = []
         self.source_indexes = []
         if os.path.exists(path_to_i_to_id):
             assert os.path.exists(path_to_len_ds)
             self.i_to_id = pickle.load(open(path_to_i_to_id,'rb'))
             self.len_ds = pickle.load(open(path_to_len_ds,'rb'))
+            self.source_indexes = pickle.load(open(path_to_source_indexes,'rb'))
+            self.target_indexes = pickle.load(open(path_to_target_indexes,'rb'))
         else:
             for id1 in tqdm(ids,desc='calculating data_len'):
                 self.i_to_id.append([self.len_ds,id1])
@@ -133,6 +137,8 @@ class CC359Ds(torch.utils.data.Dataset):
                 self.len_ds = new_len_ds
         pickle.dump(self.i_to_id,open(path_to_i_to_id,'wb'))
         pickle.dump(self.len_ds,open(path_to_len_ds,'wb'))
+        pickle.dump(self.source_indexes,open(path_to_source_indexes,'wb'))
+        pickle.dump(self.target_indexes,open(path_to_target_indexes,'wb'))
 
 
 

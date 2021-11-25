@@ -1,8 +1,12 @@
 import os
 import random
 
+import numpy
 import torch
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import  KMeans
+from sklearn.manifold import TSNE
+from tqdm import tqdm
+
 from clustering.clustered_sampler import ClusteredSampler
 from clustering.regular_sampler import RegularSampler
 import numpy as np
@@ -28,7 +32,10 @@ class DsWrapper(torch.utils.data.Dataset):
         random.shuffle(source_indexes)
         train_indexes = source_indexes[:int(len(self.ds)*0.8)]
         clustering_indexes = source_indexes[int(len(self.ds)*0.8):]+  self.ds.target_indexes
-
+        print(f"train indexes is {len(train_indexes)}")
+        print(f"clustering_indexes is {len(clustering_indexes)}")
+        print(f"source_indexes is {len(source_indexes)}")
+        print(f"target_indexes is {len(self.ds.target_indexes)}")
 
         regular_sampler = RegularSampler(data_source=self, train_indexes=train_indexes,
                                          clustering_indexes=clustering_indexes,warmup_epochs=warmups)
@@ -41,15 +48,15 @@ class DsWrapper(torch.utils.data.Dataset):
         self.index_to_cluster = {}
         self.n_clusters = n_clusters
         self.losses = [[] for _ in range(n_clusters)]
-        self.clustering_algorithm = MiniBatchKMeans(n_clusters=n_clusters)
+        self.clustering_algorithm = KMeans(n_clusters=n_clusters)
         self.arrays = []
         self.indexes = []
         self.item_to_domain = {}
+
         def feature_layer_hook(model, _, output):
             if model.training and type(self.current_sampler) == RegularSampler:
-                output = torch.mean(output,dim=1).flatten(1)
                 assert output.shape[0] == len(self.new_indexes)
-
+                output = torch.nn.MaxPool2d(2)(output)
                 for i in range(output.shape[0]):
                     self.arrays.append(output[i].cpu().detach().numpy())
                     self.indexes.append(self.new_indexes[i])
@@ -67,36 +74,42 @@ class DsWrapper(torch.utils.data.Dataset):
     def send_loss(self,loss,train_loader):
         assert loss.shape[0] == len(self.new_indexes)
         if self.current_sampler.get_clustering_flag() == "clustering":
-            self.clustering_algorithm.partial_fit(self.arrays)
-            for (index, label) in zip(self.indexes, self.clustering_algorithm.predict(self.arrays)):
-                self.index_to_cluster[index] = label
-            self.arrays = []
-            self.indexes = []
-            for i, index in enumerate(self.new_indexes):
-                self.losses[self.index_to_cluster[index]].append(torch.mean(loss[i]).item())
+            self.new_indexes = []
+            loss[loss!=0] = 0
+            if len(self.arrays) == len(self.ds):
+                X = []
+                print(f'before tsne len array is {len(self.arrays)}')
+                self.arrays = numpy.stack(self.arrays,axis=0)
+                for i in tqdm(range(16),desc='running on i'):
+                    for j in range(16):
+                        t = TSNE(n_components=3, learning_rate='auto',init='random')
+                        X.append(t.fit_transform(self.arrays[:,:,i,j]))
+                self.arrays = np.concatenate(X,axis=1)
+                labels = self.clustering_algorithm.fit_predict(self.arrays)
+                for (index, label) in zip(self.indexes, labels):
+                    self.index_to_cluster[index] = label
+                self.arrays = []
+                self.indexes = []
+        elif self.current_sampler.get_clustering_flag() == "get_loss":
+
+            assert len(self.index_to_cluster) == len(self.ds)
+            if len(self.indexes) <= len(self.ds):
+                for i, index in enumerate(self.new_indexes):
+                    self.losses[self.index_to_cluster[index]].append(torch.mean(loss[i]).item())
             self.new_indexes = []
             loss[loss!=0] = 0
 
         elif self.current_sampler.get_clustering_flag() == "done":
-
-            for i, index in enumerate(self.new_indexes):
-                self.losses[self.index_to_cluster[index]].append(torch.mean(loss[i]).item())
+            assert len(self.indexes) > len(self.ds)
             self.new_indexes = []
             loss[loss!=0] = 0
             self.ds = self.dataset_creator(**self.future_kwargs)
-            assert len(self.index_to_cluster) == len(self.ds)
             self.current_sampler = ClusteredSampler(data_source=self.ds, index_to_cluster=self.index_to_cluster,
                                                     n_cluster=self.n_clusters, losses=self.losses,item_to_domain=self.item_to_domain,decrease_center=self.decrease_center)
             train_loader.recreate(dataset=self.ds,sampler=self.current_sampler)
             self.new_indexes = []
 
         else:
-            if len(self.arrays)>=1000:
-                self.clustering_algorithm.partial_fit(self.arrays)
-                for (index, label) in zip(self.indexes, self.clustering_algorithm.predict(self.arrays)):
-                    self.index_to_cluster[index] = label
-                self.arrays = []
-                self.indexes = []
             self.new_indexes = []
         return torch.mean(loss)
 
