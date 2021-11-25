@@ -1,10 +1,12 @@
 import os
+import pickle
 import random
 
 import numpy
 import torch
 from sklearn.cluster import  KMeans
 from sklearn.manifold import TSNE
+
 from tqdm import tqdm
 
 from clustering.clustered_sampler import ClusteredSampler
@@ -83,9 +85,12 @@ class DsWrapper(torch.utils.data.Dataset):
                 X = []
                 print(f'before tsne len array is {len(self.arrays)}')
                 self.arrays = numpy.stack(self.arrays,axis=0)
+                print('dumping')
+                pickle.dump(self.arrays,open('temp_array.p','wb'))
+                print('after_sump')
                 for i in tqdm(range(16),desc='running on i'):
-                    for j in range(16):
-                        t = TSNE(n_components=3, learning_rate='auto',init='random')
+                    for j in tqdm(range(16),desc='running on j'):
+                        t = TSNE(n_components=2, learning_rate='auto',init='pca')
                         X.append(t.fit_transform(self.arrays[:,:,i,j]))
                 self.arrays = np.concatenate(X,axis=1)
                 labels = self.clustering_algorithm.fit_predict(self.arrays)
