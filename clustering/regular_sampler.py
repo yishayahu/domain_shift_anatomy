@@ -24,12 +24,14 @@ class RegularSampler(torch.utils.data.Sampler):
             random.shuffle(indexes)
             for idx in indexes:
                 yield idx
+            for i in range(16):
+                yield random.choice(self.clustering_indexes)
             self._clustering_flag = "get_loss"
             indexes = self.clustering_indexes
             random.shuffle(indexes)
             for idx in indexes:
                 yield idx
-            for i in range(64):
+            for i in range(16):
                 yield random.choice(self.clustering_indexes)
             self._clustering_flag = "done"
             for i in range(8):

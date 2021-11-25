@@ -76,6 +76,9 @@ class DsWrapper(torch.utils.data.Dataset):
         if self.current_sampler.get_clustering_flag() == "clustering":
             self.new_indexes = []
             loss[loss!=0] = 0
+            if len(self.arrays) > len(self.ds):
+                self.arrays = self.arrays[:len(self.ds)]
+                self.indexes = self.indexes[:len(self.ds)]
             if len(self.arrays) == len(self.ds):
                 X = []
                 print(f'before tsne len array is {len(self.arrays)}')
