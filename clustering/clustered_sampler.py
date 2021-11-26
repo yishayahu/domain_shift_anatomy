@@ -46,8 +46,10 @@ class ClusteredSampler(torch.utils.data.Sampler):
             self.hierarchy.append(max_idx)
             new_losses[max_idx] = -1
 
-        cluster_to_domain_dict = [[0,0] for _ in self.hierarchy]
+        cluster_to_domain_dict = [[0,0] for _ in range(self.n_cluster)]
         sum_target = 0
+        print(f"hierarchy is {self.hierarchy}")
+        assert len(self.hierarchy) == self.n_cluster
         for i in tqdm(range(len(self.ds)),desc='calculating distribuitns'):
             clus = self.index_to_cluster[i]
             domain = item_to_domain[i]
@@ -60,10 +62,8 @@ class ClusteredSampler(torch.utils.data.Sampler):
             t_per = l1[1] / sum_target
             print(f'for clus {i} target percenteage is from sum_target is {t_per}')
             if t_per > 0.8:
-                self.target_clusters.add(i+1)
-        self.hierarchy = [-1] + self.hierarchy
-        print(f"hierarchy is {self.hierarchy}")
-        assert len(self.hierarchy) == self.n_cluster + 1
+                self.target_clusters.add(i)
+
         # indexes = list(range(len(self.ds)))
         # random.shuffle(indexes)
         # for i in range(200):
@@ -89,29 +89,30 @@ class ClusteredSampler(torch.utils.data.Sampler):
     def __iter__(self):
         indexes = list(range(len(self.ds)))
         random.shuffle(indexes)
-        print(f"self.center is {self.center}")
-        print(f"steps done is {self.step}")
+
         curr_hierarchy = {}
         self.center -= self.decrease_center
         for i in range(len(self.hierarchy)):
-            if self.center < i  and i in self.target_clusters:
-                curr_hierarchy[self.hierarchy[i]] = 1
+            curr_cluster = self.hierarchy[i]
+            if self.center < i  and curr_cluster in self.target_clusters:
+                curr_hierarchy[curr_cluster] = 1
             else:
-                curr_hierarchy[self.hierarchy[i]] = np.exp(-0.2 * abs(self.center - i))
+                curr_hierarchy[curr_cluster] = np.exp(-0.2 * abs(self.center - i))
         diffs = {}
         for i in range(len(self.hierarchy)):
             diffs[i] = []
+        print(f"self.center is {self.center}")
+        print(f"steps done is {self.step}")
+        print("probs are")
+        print(sorted(curr_hierarchy.items(),key=lambda x:x[1],reverse=True))
         for idx in indexes:
-            if self.center >= 0:
-                cluster = self.index_to_cluster[idx]
-                assert cluster in curr_hierarchy
-                randi = random.random()
-                if randi < curr_hierarchy[cluster]:
-                    self.step +=1
-                    yield idx
-            else:
-                self.step += 1
+            cluster = self.index_to_cluster[idx]
+            assert cluster in curr_hierarchy
+            randi = random.random()
+            if randi < curr_hierarchy[cluster]:
+                self.step +=1
                 yield idx
+
     def __len__(self):
         return len(self.ds)
     def state_dict(self):
