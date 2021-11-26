@@ -15,6 +15,7 @@ class ClusteredSampler(torch.utils.data.Sampler):
         self.decrease_center = decrease_center
         self.n_cluster = n_cluster
         self.center = self.n_cluster + 1
+        self.target_clusters = set()
         if losses:
             self.create_distribiouns(losses,item_to_domain)
 
@@ -53,9 +54,13 @@ class ClusteredSampler(torch.utils.data.Sampler):
             if domain > 0:
                 sum_target+=1
             cluster_to_domain_dict[clus][domain] +=1
+
         for i,l1 in enumerate(cluster_to_domain_dict):
             print(f'for clus {i} source percenteage is {l1[0] / sum(l1)}')
-            print(f'for clus {i} target percenteage is from sum_target is {l1[1] / sum_target}')
+            t_per = l1[1] / sum_target
+            print(f'for clus {i} target percenteage is from sum_target is {t_per}')
+            if t_per > 0.8:
+                self.target_clusters.add(i+1)
         self.hierarchy = [-1] + self.hierarchy
         print(f"hierarchy is {self.hierarchy}")
         assert len(self.hierarchy) == self.n_cluster + 1
@@ -89,7 +94,10 @@ class ClusteredSampler(torch.utils.data.Sampler):
         curr_hierarchy = {}
         self.center -= self.decrease_center
         for i in range(len(self.hierarchy)):
-            curr_hierarchy[self.hierarchy[i]] = np.exp(-0.2 * abs(self.center - i)) if i < self.center else 1
+            if self.center < i  and i in self.target_clusters:
+                curr_hierarchy[self.hierarchy[i]] = 1
+            else:
+                curr_hierarchy[self.hierarchy[i]] = np.exp(-0.2 * abs(self.center - i))
         diffs = {}
         for i in range(len(self.hierarchy)):
             diffs[i] = []
