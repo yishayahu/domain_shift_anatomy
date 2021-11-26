@@ -5,7 +5,7 @@ import random
 import numpy
 import torch
 from sklearn.cluster import  KMeans
-from sklearn.manifold import TSNE
+from tsnecuda import TSNE
 
 from tqdm import tqdm
 
@@ -90,7 +90,7 @@ class DsWrapper(torch.utils.data.Dataset):
                 print('after_sump')
                 for i in tqdm(range(16),desc='running on i'):
                     for j in tqdm(range(16),desc='running on j'):
-                        t = TSNE(n_components=2, learning_rate='auto',init='pca')
+                        t = TSNE(n_components=2)
                         X.append(t.fit_transform(self.arrays[:,:,i,j]))
                 self.arrays = np.concatenate(X,axis=1)
                 labels = self.clustering_algorithm.fit_predict(self.arrays)
@@ -108,7 +108,6 @@ class DsWrapper(torch.utils.data.Dataset):
             loss[loss!=0] = 0
 
         elif self.current_sampler.get_clustering_flag() == "done":
-            assert len(self.indexes) > len(self.ds)
             self.new_indexes = []
             loss[loss!=0] = 0
             self.ds = self.dataset_creator(**self.future_kwargs)
