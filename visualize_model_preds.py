@@ -2,7 +2,7 @@ import argparse
 import os
 import pickle
 from functools import partial
-
+from sklearn.cluster import *
 import numpy
 import numpy as np
 import skimage
@@ -31,10 +31,9 @@ def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
     return x, y
 
 
-from tsnecuda import TSNE as TSNECUDA
 from sklearn.manifold import TSNE
-from sklearn.cluster  import DBSCAN
 
+colors = ['b','g','r']
 
 def get_model_embeddings(ds,model_runner,ids,slices_indexes):
     X = []
@@ -46,7 +45,8 @@ def get_model_embeddings(ds,model_runner,ids,slices_indexes):
             current_seg = ds.load_segm(_id)
             slices = []
             for slice_idx in slices_indexes:
-                img_slice,_ = get_random_patch_2d(current_img[...,slice_idx],current_seg[...,slice_idx],256,256)
+                img_slice,img_seg = get_random_patch_2d(current_img[...,slice_idx],current_seg[...,slice_idx],256,256)
+
                 img_slice = np.expand_dims(img_slice, axis=0)
 
                 slices.append(img_slice)
@@ -57,43 +57,32 @@ def get_model_embeddings(ds,model_runner,ids,slices_indexes):
 
 
 
-def get_embeddings(ids,slices_indexes,model_runner,fig_name):
-    pickle_file_name = f'{fig_name}.p'
-    if os.path.exists(pickle_file_name):
-        return pickle.load(open(pickle_file_name,'rb'))
+def get_embeddings(ids,slices_indexes,model_runner):
     voxel_spacing = (1, 0.95, 0.95)
     preprocessed_dataset = apply(Rescale3D(CC359(DATA_PATH), voxel_spacing), load_image=scale_mri)
     dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
 
     X = get_model_embeddings(ds=dataset,model_runner=model_runner,ids=ids,slices_indexes=slices_indexes)
     X = np.concatenate(X,axis=0)
-    pickle.dump(X,open(pickle_file_name,'wb'))
     return X
 
-def reduce_dim(X,fig_name):
-    pickle_file_name = f'{fig_name}_reduced.p'
-    if os.path.exists(pickle_file_name):
-        return pickle.load(open(pickle_file_name,'rb'))
+def reduce_dim(X):
     X_reduced = []
     for i in tqdm(range(16),desc='running on i'):
         for j in range(16):
-            if torch.cuda.is_available():
-                t = TSNECUDA(n_components=2)
-            else:
-                t = TSNE(n_components=2)
+            t = TSNE(n_components=2,init='pca',learning_rate='auto')
             X_reduced.append(t.fit_transform(X[:,:,i,j]))
     X_reduced = np.concatenate(X_reduced,axis=1)
-    pickle.dump(X_reduced,open(pickle_file_name,'wb'))
     return X_reduced
 
 def cluster_embeddings(X):
-    dbscan = DBSCAN()
+    dbscan = MeanShift()
     labels = dbscan.fit_predict(X)
     return labels
 
 def plot_embeddings(X,labels,train_size,fig_name):
     print('5')
-    colors = cm.rainbow(np.linspace(0, 1, max(labels)+2))
+
     labels = [colors[l] for l in labels]
     X_train = X[:train_size,:]
     X_test = X[train_size:,:]
@@ -113,23 +102,41 @@ def create_model_runner(state_dict_path):
     return None
 def main():
     cli = argparse.ArgumentParser()
-    cli.add_argument("--model_path", default='/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/base/checkpoints/checkpoint_59/model.pth')
     cli.add_argument("--fig_name", default='no_fig_name')
     opts = cli.parse_args()
-    model_runner = create_model_runner(opts.model_path)
     train_ids = load('/home/dsi/shaya/data_splits/ts_2/target_2/train_ids.json')
     test_ids = load('/home/dsi/shaya/data_splits/ts_2/target_2/test_ids.json')
-    slices_indexes = np.random.permutation(np.arange(150))[:25]
-    print('1')
-    X = get_embeddings(ids=train_ids+test_ids,slices_indexes=slices_indexes,model_runner=model_runner,fig_name=opts.fig_name)
-    print('1.1')
-    X = reduce_dim(X,opts.fig_name)
-    print('1.2')
-    X = TSNE(n_components=2).fit_transform(X)
-    print('2')
-    labels = cluster_embeddings(X)
-    print('2.1')
-    print('3')
+    slices_indexes = np.random.permutation(np.arange(150))[:5]
+    X = []
+    labels = []
+    if os.path.exists('XXX.p'):
+        X = pickle.load(open('XXX.p','rb'))
+        for i,X_for_model in enumerate(X):
+            labels.extend([i for _ in range(X_for_model.shape[0])])
+    else:
+        for i,model_path in enumerate(['/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/base/checkpoints/checkpoint_59/model.pth','/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/gradual_tl_keep_source/checkpoints/checkpoint_59/model.pth','/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/posttrain_testset/checkpoints/checkpoint_59/model.pth']):
+            print(f'running model {model_path}')
+
+            model_runner = create_model_runner(model_path)
+            X_for_model = get_embeddings(ids=train_ids+test_ids,slices_indexes=slices_indexes,model_runner=model_runner)
+            labels.extend([i for _ in range(X_for_model.shape[0])])
+            X.append(X_for_model)
+        pickle.dump(X,open('XXX.p','wb'))
+    dists = []
+    for i in range(X[0].shape[0]):
+        dist1 = np.sum(np.abs(X[0][i]-X[1][i]))
+        dists.append(dist1)
+    dists = np.array(dists)
+    dists_mean =np.mean(dists)
+    use_indexes = dists>dists_mean
+    for i in range(len(X)):
+        X[i] = X[i][use_indexes]
+    X = np.concatenate(X,axis=0)
+    print('reducing')
+    X = reduce_dim(X)
+    print('supr reducing')
+    X = TSNE(n_components=2,init='pca',learning_rate='auto').fit_transform(X)
+    print('ploting')
     plot_embeddings(X,labels,train_size=len(train_ids)*len(slices_indexes),fig_name=opts.fig_name)
 
 if __name__ == '__main__':

@@ -222,11 +222,9 @@ if __name__ == '__main__':
                                 architecture_main=architecture)
         lr_init_policy = 0.01
         lr_policy = Schedule(initial=lr_init_policy, epoch2value_multiplier={45: 0.1, })
-        optimizer_policy = torch.optim.SGD(
+        optimizer_policy = torch.optim.Adam(
             architecture_policy.parameters(),
             lr=lr_init_policy,
-            momentum=0.9,
-            nesterov=True,
             weight_decay=0.001
         )
 
