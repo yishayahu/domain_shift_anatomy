@@ -14,7 +14,7 @@ class ClusteredSampler(torch.utils.data.Sampler):
         self.hierarchy = []
         self.decrease_center = decrease_center
         self.n_cluster = n_cluster
-        self.center = self.n_cluster + 1
+        self.center = self.n_cluster
         self.target_clusters = set()
         if losses:
             self.create_distribiouns(losses,item_to_domain)
@@ -58,11 +58,12 @@ class ClusteredSampler(torch.utils.data.Sampler):
             cluster_to_domain_dict[clus][domain] +=1
 
         for i,l1 in enumerate(cluster_to_domain_dict):
-            print(f'for clus {i} source percenteage is {l1[0] / sum(l1)}')
-            t_per = l1[1] / sum_target
-            print(f'for clus {i} target percenteage is from sum_target is {t_per}')
-            if t_per > 0.8:
+            s_per =l1[0] / sum(l1)
+            print(f'for clus {i} source percenteage is {s_per}')
+            if s_per < 0.2:
                 self.target_clusters.add(i)
+            print(f'for clus {i} target percenteage is from sum_target is {l1[1] / sum_target}')
+
 
         # indexes = list(range(len(self.ds)))
         # random.shuffle(indexes)

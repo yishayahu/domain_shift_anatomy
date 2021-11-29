@@ -83,7 +83,7 @@ def reduce_dim(X,fig_name):
                 t = TSNE(n_components=2)
             X_reduced.append(t.fit_transform(X[:,:,i,j]))
     X_reduced = np.concatenate(X_reduced,axis=1)
-    pickle.dump(X,open(pickle_file_name,'wb'))
+    pickle.dump(X_reduced,open(pickle_file_name,'wb'))
     return X_reduced
 
 def cluster_embeddings(X):
@@ -124,11 +124,11 @@ def main():
     X = get_embeddings(ids=train_ids+test_ids,slices_indexes=slices_indexes,model_runner=model_runner,fig_name=opts.fig_name)
     print('1.1')
     X = reduce_dim(X,opts.fig_name)
-    X = TSNE(n_components=10,method='exact').fit_transform(X)
+    print('1.2')
+    X = TSNE(n_components=2).fit_transform(X)
     print('2')
     labels = cluster_embeddings(X)
     print('2.1')
-    X = TSNE(n_components=2).fit_transform(X)
     print('3')
     plot_embeddings(X,labels,train_size=len(train_ids)*len(slices_indexes),fig_name=opts.fig_name)
 
