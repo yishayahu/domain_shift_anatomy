@@ -117,7 +117,7 @@ if __name__ == '__main__':
     if getattr(cfg,'TRAIN_ON_TEST',False):
         train_ids = test_ids
     val_ids = load(os.path.join(splits_dir,'val_ids.json'))
-    base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model.pth')
+
 
     ## training params
     freeze_func = cfg.FREEZE_FUNC
@@ -128,6 +128,11 @@ if __name__ == '__main__':
     spot = getattr(cfg,'SPOT',False)
     clustering = getattr(cfg,'CLUSTERING',False)
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
+    if optimizer_creator.func == SGD:
+        base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_sgd.pth')
+    else:
+        assert optimizer_creator.func == Adam
+        base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_adam.pth')
     batch_size = 16
     lr_init = 1e-3
     if opts.train_only_source:

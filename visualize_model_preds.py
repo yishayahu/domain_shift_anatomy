@@ -9,9 +9,9 @@ import skimage
 import torch
 from dpipe.dataset.wrappers import apply, cache_methods
 from dpipe.io import load
-from dpipe.torch import load_model_state, inference_step
+from dpipe.torch import load_model_state
 from matplotlib import cm
-from spottunet.torch.utils import none_func
+
 
 from spottunet.torch.module.unet import UNet2D
 
@@ -31,8 +31,8 @@ def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
     return x, y
 
 if torch.cuda.is_available():
-    from cuml.manifold import TSNE
-    from cuml.cluster  import DBSCAN
+    from tsnecuda import TSNE
+    from sklearn.cluster  import DBSCAN
 else:
     from sklearn.manifold import TSNE
     from sklearn.cluster  import DBSCAN
@@ -40,6 +40,8 @@ else:
 
 def get_model_embeddings(ds,model_runner,ids,slices_indexes):
     X = []
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model_runner = model_runner.to(device)
     with torch.no_grad():
         for _id in tqdm(ids):
             current_img = ds.load_image(_id)
@@ -50,9 +52,9 @@ def get_model_embeddings(ds,model_runner,ids,slices_indexes):
                 img_slice = np.expand_dims(img_slice, axis=0)
 
                 slices.append(img_slice)
-            img_slice = model_runner(torch.tensor(np.stack(slices,axis=0)))
+            img_slice = model_runner(torch.tensor(np.stack(slices,axis=0),device=device))
             img_slice = nn.MaxPool2d(2)(img_slice)
-            X.append(img_slice.numpy())
+            X.append(img_slice.cpu().numpy())
     return  X
 
 
@@ -101,6 +103,7 @@ def create_model_runner(state_dict_path):
         model = UNet2D(1,1,16,get_bottleneck=True)
         load_model_state(model, state_dict_path)
         model.eval()
+
         return model # todo: maybe change
     return None
 def main():
@@ -110,8 +113,8 @@ def main():
     opts = cli.parse_args()
     model_runner = create_model_runner(opts.model_path)
     train_ids = load('/home/dsi/shaya/data_splits/ts_2/target_2/train_ids.json')
-    test_ids = load('/home/dsi/shaya/data_splits/ts_2/target_2/test_ids.json')[:2]
-    slices_indexes = np.random.permutation(np.arange(150))[:20]
+    test_ids = load('/home/dsi/shaya/data_splits/ts_2/target_2/test_ids.json')
+    slices_indexes = np.random.permutation(np.arange(150))[:25]
     print('1')
     X = get_embeddings(ids=train_ids+test_ids,slices_indexes=slices_indexes,model_runner=model_runner,fig_name=opts.fig_name)
     print('1.1')

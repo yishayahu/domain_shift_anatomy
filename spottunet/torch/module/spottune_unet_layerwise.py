@@ -103,11 +103,8 @@ class SpottuneUNet2D(nn.Module):
     def forward_block(self, x, block_ft, block_fr, action_mask, i):
 
         for layer_ft, layer_fr in zip(block_ft, block_fr):
-            if type(layer_ft) == nn.BatchNorm2d:
-                x = layer_fr(x)
-            else:
-                policy_current = action_mask[..., i]
-                x = layer_ft(x) * (1 - policy_current) + layer_fr(x) * policy_current
+            policy_current = action_mask[..., i]
+            x = layer_ft(x) * (1 - policy_current) + layer_fr(x) * policy_current
             if isinstance(layer_ft, self.parallelized_blocks):
                 i += 1
         return x, i
@@ -119,15 +116,18 @@ class SpottuneUNet2D(nn.Module):
         i = 0
 
         x, i = self.forward_block(x, self.init_path, self.init_path_freezed, action_mask, i)
-        shortcut0 = self.shortcut0(x) * (1 - action_mask[..., self.policy_shape - 3]) + self.shortcut0_freezed(x) * \
-                    action_mask[..., self.policy_shape - 3]
+        shortcut0 = self.shortcut0(x)
+                    # * (1 - action_mask[..., self.policy_shape - 3]) + self.shortcut0_freezed(x) * \
+                    # action_mask[..., self.policy_shape - 3]
 
         x, i = self.forward_block(x, self.down1, self.down1_freezed, action_mask, i)
-        shortcut1 = self.shortcut1(x) * (1 - action_mask[..., self.policy_shape - 2]) + self.shortcut1_freezed(x) * \
+        shortcut1 = self.shortcut1(x) \
+                    * (1 - action_mask[..., self.policy_shape - 2]) + self.shortcut1_freezed(x) * \
                     action_mask[..., self.policy_shape - 2]
 
         x, i = self.forward_block(x, self.down2, self.down2_freezed, action_mask, i)
-        shortcut2 = self.shortcut2(x) * (1 - action_mask[..., self.policy_shape - 1]) + self.shortcut2_freezed(x) * \
+        shortcut2 = self.shortcut2(x) \
+                    * (1 - action_mask[..., self.policy_shape - 1]) + self.shortcut2_freezed(x) * \
                     action_mask[..., self.policy_shape - 1]
 
         x, i = self.forward_block(x, self.bottleneck, self.bottleneck_freezed, action_mask, i)
@@ -168,9 +168,9 @@ class SpottuneUNet2D(nn.Module):
         self.val_iter_tracker = 0
 
         tb_record = {}
-        for i in range(self.policy_shape - 3):
+        for i in range(self.policy_shape-2):
             tb_record['val: block ' + str(i + 1)] = val_stats[i]
-        for i in range(self.policy_shape - 3, self.policy_shape):
+        for i in range(self.policy_shape - 2, self.policy_shape):
             tb_record['val: shortcut ' + str(i - (self.policy_shape - 4))] = val_stats[i]
 
         return tb_record
@@ -184,9 +184,9 @@ class SpottuneUNet2D(nn.Module):
         self.policy_tracker_temp = self.policy_tracker.clone()
 
         tb_record = {}
-        for i in range(self.policy_shape - 3):
+        for i in range(self.policy_shape -2):
             tb_record['train: block ' + str(i + 1)] = train_stats[i]
-        for i in range(self.policy_shape - 3, self.policy_shape):
+        for i in range(self.policy_shape - 2, self.policy_shape):
             tb_record['train: shortcut ' + str(i - (self.policy_shape - 4))] = train_stats[i]
 
         return tb_record

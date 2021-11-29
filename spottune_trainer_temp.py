@@ -12,7 +12,8 @@ from dpipe.train.logging import TBLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state
 from spottunet.torch.model import train_step, inference_step_spottune, train_step_spottune
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
-from spottunet.metric import evaluate_individual_metrics_probably_with_ids, compute_metrics_probably_with_ids, aggregate_metric_probably_with_ids, compute_metrics_probably_with_ids_spottune, evaluate_individual_metrics_probably_with_ids_no_pred
+from spottunet.metric import evaluate_individual_metrics_probably_with_ids, compute_metrics_probably_with_ids, \
+    aggregate_metric_probably_with_ids, compute_metrics_probably_with_ids_spottune, evaluate_individual_metrics_probably_with_ids_no_pred
 from spottunet.split import one2one
 from dpipe.dataset.wrappers import apply, cache_methods
 from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri
@@ -28,12 +29,15 @@ from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
 from spottunet.torch.utils import load_model_state_fold_wise, modify_state_fn_spottune, freeze_model_spottune
 
-exp_dir = '/home/dsi/shaya/dart_results/spottune/experiment_0'
+exp_dir = '/home/dsi/shaya/dart_results/spottune/experiment_2'
+soft = True
 log_path = os.path.join(exp_dir,'train_logs')
 saved_model_path = os.path.join(exp_dir,'model.pth')
 test_predictions_path = os.path.join(exp_dir,'test_predictions')
 test_metrics_path = os.path.join(exp_dir,'test_metrics')
 checkpoints_path = os.path.join(exp_dir,'checkpoints')
+saved_model_path_main = os.path.join(exp_dir,'model_main.pth')
+saved_model_path_policy = os.path.join(exp_dir,'model_policy.pth')
 data_path = DATA_PATH
 
 voxel_spacing = (1, 0.95, 0.95)
@@ -50,9 +54,9 @@ n_exps = 30
 split = one2one(dataset.df, val_size=val_size, n_add_ids=n_add_ids,
                 train_on_add_only=pretrained, seed=seed)[n_first_exclude:n_exps]
 layout = Flat(split)
-train_ids = layout.get_ids('train',folder=exp_dir)
-test_ids = layout.get_ids('test',folder=exp_dir)
-val_ids = layout.get_ids('val',folder=exp_dir)
+train_ids = layout.get_ids('train',folder='/home/dsi/shaya/data_splits/ts_2/target_2')
+test_ids = layout.get_ids('test',folder='/home/dsi/shaya/data_splits/ts_2/target_2')
+val_ids = layout.get_ids('val',folder='/home/dsi/shaya/data_splits/ts_2/target_2')
 
 n_chans_in = 1
 n_chans_out = 1
@@ -77,7 +81,7 @@ use_gumbel_inference = False
 @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
 def predict(image):
     return inference_step_spottune(image, architecture_main=architecture_main, architecture_policy=architecture_policy,
-                                   activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference)
+                                   activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference,soft=soft)
 
 
 val_predict = predict
@@ -89,7 +93,7 @@ validate_step = partial(compute_metrics_probably_with_ids_spottune, predict=val_
                         load_x=load_x, load_y=load_y, ids=val_ids, metrics=val_metrics,
                         architecture_main=architecture_main)
 
-logger = WANDBLogger(project='spot3',dir=exp_dir,entity=None)
+logger = WANDBLogger(project='spot2',dir=exp_dir,entity=None)
 
 
 alpha_l2sp = None
@@ -127,7 +131,7 @@ criterion = weighted_cross_entropy_with_logits
 train_kwargs = dict(lr_main=lr_main, lr_policy=lr_policy, k_reg=k_reg, k_reg_source=k_reg_source, reg_mode=reg_mode,
                     architecture_main=architecture_main, architecture_policy=architecture_policy,
                     temperature=temperature, with_source=with_source, optimizer_main=optimizer_main,
-                    optimizer_policy=optimizer_policy, criterion=criterion, alpha_l2sp=alpha_l2sp)
+                    optimizer_policy=optimizer_policy, criterion=criterion, alpha_l2sp=alpha_l2sp,soft=soft)
 
 checkpoints = Checkpoints(checkpoints_path, {
     **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
@@ -187,16 +191,14 @@ device = 'cuda:7' if torch.cuda.is_available() else 'cpu'
 
 baseline_exp_path = BASELINE_PATH
 
-saved_model_path_main = 'model_main.pth'
-saved_model_path_policy = 'model_policy.pth'
+
 
 run_experiment = run(
     fix_seed(seed=0xBAAAAAAD),
-    lock_dir(),
+    lock_dir(exp_dir),
 
-    load_model_state_fold_wise(architecture=architecture_main, baseline_exp_path=baseline_exp_path,
-                               modify_state_fn=modify_state_fn_spottune, n_folds=len(dataset.df.fold.unique()),
-                               n_first_exclude=n_first_exclude),
+    load_model_state_fold_wise(architecture=architecture_main, baseline_exp_path='/home/dsi/shaya/data_splits/sources/source_0/model.pth',
+                               modify_state_fn=modify_state_fn_spottune),
 
     freeze_model_spottune(architecture_main),
     architecture_main.to(device),
