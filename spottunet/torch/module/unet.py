@@ -5,10 +5,11 @@ from dpipe.layers.conv import PreActivation2d
 
 
 class UNet2D(nn.Module):
-    def __init__(self, n_chans_in, n_chans_out, n_filters_init=8):
+    def __init__(self, n_chans_in, n_chans_out, n_filters_init=8,get_bottleneck=False):
         super().__init__()
         self.n_filters_init = n_filters_init
         n = n_filters_init
+        self.get_bottleneck=get_bottleneck
 
         self.init_path = nn.Sequential(
             nn.Conv2d(n_chans_in, n, kernel_size=3, padding=1, bias=False),
@@ -62,12 +63,14 @@ class UNet2D(nn.Module):
             nn.BatchNorm2d(n_chans_out)
         )
 
-    def forward(self, x):
+    def forward(self, x,):
         x0 = self.init_path(x)
         x1 = self.down1(x0)
         x2 = self.down2(x1)
-
-        x2_up = self.up2(self.bottleneck(x2) + self.shortcut2(x2))
+        b0 = self.bottleneck(x2)
+        if self.get_bottleneck:
+            return b0
+        x2_up = self.up2(b0 + self.shortcut2(x2))
         x1_up = self.up1(x2_up + self.shortcut1(x1))
         x_out = self.out_path(x1_up + self.shortcut0(x0))
 

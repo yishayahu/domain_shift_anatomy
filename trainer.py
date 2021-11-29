@@ -114,6 +114,8 @@ if __name__ == '__main__':
     if getattr(cfg,'ADD_SOURCE_IDS',False):
         train_ids = load(os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','train_ids.json')) + train_ids
     test_ids = load(os.path.join(splits_dir,'test_ids.json'))
+    if getattr(cfg,'TRAIN_ON_TEST',False):
+        train_ids = test_ids
     val_ids = load(os.path.join(splits_dir,'val_ids.json'))
     base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model.pth')
 
