@@ -108,18 +108,16 @@ def main():
     test_ids = load('/home/dsi/shaya/data_splits/ts_2/target_2/test_ids.json')
     slices_indexes = np.random.permutation(np.arange(150))[:5]
     X = []
-    labels = []
+
     if os.path.exists('XXX.p'):
         X = pickle.load(open('XXX.p','rb'))
-        for i,X_for_model in enumerate(X):
-            labels.extend([i for _ in range(X_for_model.shape[0])])
     else:
         for i,model_path in enumerate(['/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/base/checkpoints/checkpoint_59/model.pth','/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/gradual_tl_keep_source/checkpoints/checkpoint_59/model.pth','/home/dsi/shaya/spottune_results/ts_size_2/source_0_target_2/posttrain_testset/checkpoints/checkpoint_59/model.pth']):
             print(f'running model {model_path}')
 
             model_runner = create_model_runner(model_path)
             X_for_model = get_embeddings(ids=train_ids+test_ids,slices_indexes=slices_indexes,model_runner=model_runner)
-            labels.extend([i for _ in range(X_for_model.shape[0])])
+
             X.append(X_for_model)
         pickle.dump(X,open('XXX.p','wb'))
     dists = []
@@ -129,8 +127,10 @@ def main():
     dists = np.array(dists)
     dists_mean =np.mean(dists)
     use_indexes = dists>dists_mean
+    labels = []
     for i in range(len(X)):
         X[i] = X[i][use_indexes]
+        labels.extend([i for _ in range(X[i].shape[0])])
     X = np.concatenate(X,axis=0)
     print('reducing')
     X = reduce_dim(X)

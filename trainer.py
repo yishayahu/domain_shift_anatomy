@@ -189,6 +189,8 @@ if __name__ == '__main__':
     if getattr(cfg,'CONTINUE_OPTIMIZER',False):
         print(f'loading optimizer from path {optim_state_dict_path}')
         optimizer.load_state_dict(torch.load(optim_state_dict_path,map_location=torch.device('cpu')))
+        for k,v in optimizer.defaults.items():
+            optimizer.param_groups[0][k] = v
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
     if type(lr) == partial:
         lr = lr()
