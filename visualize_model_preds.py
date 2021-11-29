@@ -30,12 +30,10 @@ def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
     x, y = extract_patch((image_slc, segm_slc, center), x_patch_size, y_patch_size, spatial_dims=sp_dims_2d)
     return x, y
 
-if torch.cuda.is_available():
-    from tsnecuda import TSNE
-    from sklearn.cluster  import DBSCAN
-else:
-    from sklearn.manifold import TSNE
-    from sklearn.cluster  import DBSCAN
+
+from tsnecuda import TSNE as TSNECUDA
+from sklearn.manifold import TSNE
+from sklearn.cluster  import DBSCAN
 
 
 def get_model_embeddings(ds,model_runner,ids,slices_indexes):
@@ -72,13 +70,20 @@ def get_embeddings(ids,slices_indexes,model_runner,fig_name):
     pickle.dump(X,open(pickle_file_name,'wb'))
     return X
 
-def reduce_dim(X):
+def reduce_dim(X,fig_name):
+    pickle_file_name = f'{fig_name}_reduced.p'
+    if os.path.exists(pickle_file_name):
+        return pickle.load(open(pickle_file_name,'rb'))
     X_reduced = []
     for i in tqdm(range(16),desc='running on i'):
-        for j in tqdm(range(16),desc='running on j'):
-            t = TSNE(n_components=2)
+        for j in range(16):
+            if torch.cuda.is_available():
+                t = TSNECUDA(n_components=2)
+            else:
+                t = TSNE(n_components=2)
             X_reduced.append(t.fit_transform(X[:,:,i,j]))
     X_reduced = np.concatenate(X_reduced,axis=1)
+    pickle.dump(X,open(pickle_file_name,'wb'))
     return X_reduced
 
 def cluster_embeddings(X):
@@ -104,7 +109,7 @@ def create_model_runner(state_dict_path):
         load_model_state(model, state_dict_path)
         model.eval()
 
-        return model # todo: maybe change
+        return model
     return None
 def main():
     cli = argparse.ArgumentParser()
@@ -118,7 +123,8 @@ def main():
     print('1')
     X = get_embeddings(ids=train_ids+test_ids,slices_indexes=slices_indexes,model_runner=model_runner,fig_name=opts.fig_name)
     print('1.1')
-    X = reduce_dim(X)
+    X = reduce_dim(X,opts.fig_name)
+    X = TSNE(n_components=10,method='exact').fit_transform(X)
     print('2')
     labels = cluster_embeddings(X)
     print('2.1')

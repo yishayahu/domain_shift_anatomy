@@ -130,9 +130,11 @@ if __name__ == '__main__':
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     if optimizer_creator.func == SGD:
         base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_sgd.pth')
+        optim_state_dict_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
     else:
         assert optimizer_creator.func == Adam
         base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_adam.pth')
+        optim_state_dict_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','optimizer_adam.pth')
     batch_size = 16
     lr_init = 1e-3
     if opts.train_only_source:
@@ -174,6 +176,7 @@ if __name__ == '__main__':
 
     architecture.to(device)
     if not opts.train_only_source:
+        print(f'loading ckpt from {base_ckpt_path}')
         load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
 
     logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name,config=cfg_path)
@@ -183,6 +186,9 @@ if __name__ == '__main__':
         lr=lr_init,
         weight_decay=0
     )
+    if getattr(cfg,'CONTINUE_OPTIMIZER',False):
+        print(f'loading optimizer from path {optim_state_dict_path}')
+        optimizer.load_state_dict(torch.load(optim_state_dict_path,map_location=torch.device('cpu')))
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
     if type(lr) == partial:
         lr = lr()
