@@ -10,8 +10,9 @@ if __name__ == '__main__':
     device = 'cuda:5'
     combs = list(combinations(list(range(6)), 2))
     random.shuffle(combs)
-    for exp in experiments:
-        for combination in combs:
+
+    for combination in combs:
+        for exp in experiments:
             source, target = combination
             if source == 0 and target == 2:
                 continue
