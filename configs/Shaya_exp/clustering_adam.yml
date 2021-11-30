@@ -1,0 +1,14 @@
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 47
+N_CLUSTERS: 30
+WARMUPS: 0
+DECREASE_CENTER: 1
+ADD_SOURCE_IDS: True
+CLUSTERING: True
+OPTIMIZER:
+  FUNC: Adam
+SECOND_ROUND:
+  CRITERION:
+    FUNC: weighted_cross_entropy_with_logits
+    reduce:
+
