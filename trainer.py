@@ -180,7 +180,7 @@ if __name__ == '__main__':
         print(f'loading ckpt from {base_ckpt_path}')
         load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
 
-    logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name,config=cfg_path)
+    logger = WANDBLogger(project=project,dir=exp_dir,entity=None,run_name=opts.exp_name)
 
     optimizer = optimizer_creator(
         architecture.parameters(),
