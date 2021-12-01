@@ -14,10 +14,11 @@ from clustering.regular_sampler import RegularSampler
 import numpy as np
 
 class DsWrapper(torch.utils.data.Dataset):
-    def __init__(self,model,dataset_creator,n_clusters,feature_layer_name,warmups,exp_name,decrease_center,**kwargs):
-
+    def __init__(self,model,dataset_creator,n_clusters,feature_layer_name,warmups,exp_name,decrease_center,exp_dir,**kwargs):
+        self.exp_dir = exp_dir
         #####
         kwargs['out_domain'] = True
+        kwargs['exp_dir'] = exp_dir
         self.ds = dataset_creator(**kwargs,start=True)
         self.dataset_creator = dataset_creator
         self.future_kwargs = kwargs
@@ -85,14 +86,15 @@ class DsWrapper(torch.utils.data.Dataset):
                 X = []
                 print(f'before tsne len array is {len(self.arrays)}')
                 self.arrays = numpy.stack(self.arrays,axis=0)
-                print('dumping')
-                pickle.dump(self.arrays,open('temp_array.p','wb'))
-                print('after_sump')
+
+                pickle.dump(self.arrays,open(os.path.join(self.exp_dir,'array_before_tsne.p'),'wb'))
+
                 for i in tqdm(range(16),desc='running on i'):
                     for j in tqdm(range(16),desc='running on j'):
                         t = TSNE(n_components=2)
                         X.append(t.fit_transform(self.arrays[:,:,i,j]))
                 self.arrays = np.concatenate(X,axis=1)
+                pickle.dump(self.arrays,open(os.path.join(self.exp_dir,'array_after_tsne.p'),'wb'))
                 labels = self.clustering_algorithm.fit_predict(self.arrays)
                 for (index, label) in zip(self.indexes, labels):
                     self.index_to_cluster[index] = label
