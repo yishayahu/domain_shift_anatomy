@@ -1,8 +1,6 @@
 FREEZE_FUNC: "none_func"
 NUM_EPOCHS: 60
 OPTIMIZER:
-  FUNC: Adam
-  betas:
-    - 0.99
-    - 0.9999
+  FUNC: SGD
+  momentum: 0.99
 CONTINUE_OPTIMIZER: True

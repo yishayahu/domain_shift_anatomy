@@ -88,8 +88,8 @@ if __name__ == '__main__':
     cli.add_argument("--ts_size", default=2)
     cli.add_argument("--train_only_source", action='store_true')
     opts = cli.parse_args()
-    cfg_path = open(f"configs/Shaya_exp/{opts.config}.yml", "r")
-    cfg = Config(yaml.safe_load(cfg_path))
+    cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
+    cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
     if opts.train_only_source:
@@ -109,6 +109,7 @@ if __name__ == '__main__':
     best_test_metrics_path = os.path.join(exp_dir,'best_test_metrics')
     checkpoints_path = os.path.join(exp_dir,'checkpoints')
     data_path = DATA_PATH
+    shutil.copy(cfg_path,os.path.join(exp_dir,'config.yml'))
 
     train_ids = load(os.path.join(splits_dir,'train_ids.json'))
     if getattr(cfg,'ADD_SOURCE_IDS',False):
