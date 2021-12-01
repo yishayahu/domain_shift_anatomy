@@ -88,7 +88,8 @@ class DsWrapper(torch.utils.data.Dataset):
                 self.arrays = numpy.stack(self.arrays,axis=0)
 
                 pickle.dump(self.arrays,open(os.path.join(self.exp_dir,'array_before_tsne.p'),'wb'))
-
+                pickle.dump(self.item_to_domain,open(os.path.join(self.exp_dir,'item_to_domain.p'),'wb'))
+                pickle.dump(self.indexes,open(os.path.join(self.exp_dir,'indexes.p'),'wb'))
                 for i in tqdm(range(16),desc='running on i'):
                     for j in tqdm(range(16),desc='running on j'):
                         t = TSNE(n_components=2)
