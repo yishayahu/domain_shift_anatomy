@@ -138,8 +138,8 @@ class CC359Ds(torch.utils.data.Dataset):
                     self.target_indexes += list(range(self.len_ds, new_len_ds))
                 else:
                     if split_source:
-                        new_len_ds =self.len_ds + 100
-                        self.idx_to_slice[id1] = np.random.choice(range(num_of_slices),size=100,replace=False)
+                        new_len_ds =self.len_ds + split_source
+                        self.idx_to_slice[id1] = np.random.choice(range(num_of_slices),size=split_source,replace=False)
                     else:
                         new_len_ds = self.len_ds + num_of_slices
                     self.source_indexes += list(range(self.len_ds, new_len_ds))
