@@ -59,10 +59,11 @@ class ClusteredSampler(torch.utils.data.Sampler):
 
         for i,l1 in enumerate(cluster_to_domain_dict):
             s_per =l1[0] / sum(l1)
+            l_per = l1[1] / sum_target
             print(f'for clus {i} source percenteage is {s_per}')
             if s_per < 0.2:
                 self.target_clusters.add(i)
-            print(f'for clus {i} target percenteage is from sum_target is {l1[1] / sum_target}')
+            print(f'for clus {i} target percenteage is from sum_target is {l_per}')
 
 
         # indexes = list(range(len(self.ds)))

@@ -117,16 +117,17 @@ class CC359Ds(torch.utils.data.Dataset):
         path_to_len_ds = os.path.join(exp_dir,'len_ds.p')
         path_to_target_indexes = os.path.join(exp_dir,'target_indexes.p')
         path_to_source_indexes = os.path.join(exp_dir,'source_indexes.p')
+        path_idx_to_slice = os.path.join(exp_dir,'idx_to_slice.p')
         self.target_indexes = []
         self.source_indexes = []
         self.idx_to_slice = {}
         if os.path.exists(path_to_i_to_id):
             assert os.path.exists(path_to_len_ds)
-            assert not split_source
             self.i_to_id = pickle.load(open(path_to_i_to_id,'rb'))
             self.len_ds = pickle.load(open(path_to_len_ds,'rb'))
             self.source_indexes = pickle.load(open(path_to_source_indexes,'rb'))
             self.target_indexes = pickle.load(open(path_to_target_indexes,'rb'))
+            self.idx_to_slice = pickle.load(open(path_idx_to_slice,'rb'))
         else:
             for id1 in tqdm(ids,desc='calculating data_len'):
                 self.i_to_id.append([self.len_ds,id1])
@@ -147,6 +148,7 @@ class CC359Ds(torch.utils.data.Dataset):
         pickle.dump(self.len_ds,open(path_to_len_ds,'wb'))
         pickle.dump(self.source_indexes,open(path_to_source_indexes,'wb'))
         pickle.dump(self.target_indexes,open(path_to_target_indexes,'wb'))
+        pickle.dump(self.idx_to_slice,open(path_idx_to_slice,'wb'))
 
 
 
