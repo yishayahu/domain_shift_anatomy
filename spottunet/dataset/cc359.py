@@ -102,7 +102,7 @@ def scale_mri(image: np.ndarray, q_min: int = 1, q_max: int = 99) -> np.ndarray:
 
 
 class CC359Ds(torch.utils.data.Dataset):
-    def __init__(self,ids,ds,start,patch_func,exp_dir,source_domain,target_domain,out_domain):
+    def __init__(self,ids,ds,start,patch_func,exp_dir,source_domain,target_domain,out_domain,split_source):
         self.image_loader = ds.load_image
         self.seg_loader = ds.load_segm
         self.domain_loader = ds.load_domain_label
@@ -119,8 +119,10 @@ class CC359Ds(torch.utils.data.Dataset):
         path_to_source_indexes = os.path.join(exp_dir,'source_indexes.p')
         self.target_indexes = []
         self.source_indexes = []
+        self.idx_to_slice = {}
         if os.path.exists(path_to_i_to_id):
             assert os.path.exists(path_to_len_ds)
+            assert not split_source
             self.i_to_id = pickle.load(open(path_to_i_to_id,'rb'))
             self.len_ds = pickle.load(open(path_to_len_ds,'rb'))
             self.source_indexes = pickle.load(open(path_to_source_indexes,'rb'))
@@ -129,10 +131,16 @@ class CC359Ds(torch.utils.data.Dataset):
             for id1 in tqdm(ids,desc='calculating data_len'):
                 self.i_to_id.append([self.len_ds,id1])
                 domain = int(np.argmax(self.domain_loader(id1)) == self.target_domain)
-                new_len_ds = self.len_ds + self.image_loader(id1).shape[-1]
+                num_of_slices = self.image_loader(id1).shape[-1]
                 if domain > 0:
+                    new_len_ds = self.len_ds + num_of_slices
                     self.target_indexes += list(range(self.len_ds, new_len_ds))
                 else:
+                    if split_source:
+                        new_len_ds =self.len_ds + 100
+                        self.idx_to_slice[id1] = np.random.choice(range(num_of_slices),size=100,replace=False)
+                    else:
+                        new_len_ds = self.len_ds + num_of_slices
                     self.source_indexes += list(range(self.len_ds, new_len_ds))
                 self.len_ds = new_len_ds
         pickle.dump(self.i_to_id,open(path_to_i_to_id,'wb'))
@@ -145,8 +153,16 @@ class CC359Ds(torch.utils.data.Dataset):
     def __getitem__(self, item):
         for (i,id1),(next_i,_) in zip(self.i_to_id,self.i_to_id[1:]+[(self.len_ds,None)]):
             if i <= item < next_i:
-                img_slc = self.image_loader(id1)[...,item-i]
-                seg_slc = self.seg_loader(id1)[...,item-i]
+                img = self.image_loader(id1)
+                seg = self.seg_loader(id1)
+                if id1 in self.idx_to_slice:
+                    slice_idx = self.idx_to_slice[id1][item-i]
+                    img_slc = img[...,slice_idx]
+                    seg_slc = seg[...,slice_idx]
+                else:
+                    img_slc = img[...,item-i]
+                    seg_slc = seg[...,item-i]
+
                 img_slc,seg_slc = self.patch_func(img_slc,seg_slc,256,256)
                 img_slc,seg_slc = np.expand_dims(img_slc, axis=0),np.expand_dims(seg_slc, axis=0)
                 if not self.out_domain:

@@ -274,9 +274,9 @@ if __name__ == '__main__':
 
     x_patch_size = y_patch_size = np.array([256, 256])
     if clustering:
-
+        split_source = getattr(cfg,'SPLIT_SOURCE',False)
         train_dataset = DsWrapper(model=architecture,ids=train_ids,ds=dataset, dataset_creator=CC359Ds,
-                                  n_clusters=cfg.N_CLUSTERS, feature_layer_name='bottleneck.3',warmups=cfg.WARMUPS,exp_name=opts.exp_name,decrease_center=cfg.DECREASE_CENTER,patch_func=get_random_patch_2d,exp_dir=exp_dir,source_domain=opts.source,target_domain=opts.target)
+                                  n_clusters=cfg.N_CLUSTERS, feature_layer_name='bottleneck.3',warmups=cfg.WARMUPS,exp_name=opts.exp_name,decrease_center=cfg.DECREASE_CENTER,patch_func=get_random_patch_2d,exp_dir=exp_dir,source_domain=opts.source,target_domain=opts.target,split_source=split_source)
         data_loader_func = DataLoaderWrapper(torch.utils.data.DataLoader).recreate
         batch_iter = data_loader_func(
             dataset =train_dataset, batch_size=batch_size,
