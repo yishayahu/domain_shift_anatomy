@@ -63,28 +63,28 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
                 param_size_per_layer.append(float(torch.mean(torch.abs(p1))))
                 normalize_dist_per_layer.append(dist_pet_layer[-1] / param_size_per_layer[-1])
                 names.append(n1)
+        if False:
+            for k, v in {'dist': dist_pet_layer, 'param_size': param_size_per_layer,
+                         'relative_dist': normalize_dist_per_layer, 'dist_bn': dist_pet_layer_bn,
+                         'param_size_bn': param_size_per_layer_bn, 'relative_dist_bn': normalize_dist_per_layer_bn}.items():
+                im_path = f'{train_step_logger._experiment.name}_{k}.png'
+                if 'bn' in k:
+                    curr_names = names_bn
+                else:
+                    curr_names = names
+                print(f'max for {k} is in layer {curr_names[np.argmax(v)]} and its values is {np.max(v)}')
 
-        for k, v in {'dist': dist_pet_layer, 'param_size': param_size_per_layer,
-                     'relative_dist': normalize_dist_per_layer, 'dist_bn': dist_pet_layer_bn,
-                     'param_size_bn': param_size_per_layer_bn, 'relative_dist_bn': normalize_dist_per_layer_bn}.items():
-            im_path = f'{train_step_logger._experiment.name}_{k}.png'
-            if 'bn' in k:
-                curr_names = names_bn
-            else:
-                curr_names = names
-            print(f'max for {k} is in layer {curr_names[np.argmax(v)]} and its values is {np.max(v)}')
+                plt.plot(list(range(len(v))), v)
+                plt.savefig(im_path)
 
-            plt.plot(list(range(len(v))), v)
-            plt.savefig(im_path)
-
-            log_log = {f'{k}': wandb.Image(im_path)}
-            if len(optimizer.param_groups) > 1 and k == 'dist':
-                for i in range(len(optimizer.param_groups)):
-                    print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
-                    log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']
-            wandb.log(log_log, step=train_step_logger._experiment.step)
-            plt.cla()
-            plt.clf()
+                log_log = {f'{k}': wandb.Image(im_path)}
+                if len(optimizer.param_groups) > 1 and k == 'dist':
+                    for i in range(len(optimizer.param_groups)):
+                        print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
+                        log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']
+                wandb.log(log_log, step=train_step_logger._experiment.step)
+                plt.cla()
+                plt.clf()
 
     if loss_key is not None:
         optimizer_step(optimizer, loss[loss_key], **optimizer_params)
