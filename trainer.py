@@ -128,8 +128,9 @@ if __name__ == '__main__':
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     spot = getattr(cfg,'SPOT',False)
     clustering = getattr(cfg,'CLUSTERING',False)
+
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
-    if optimizer_creator.func == SGD:
+    if optimizer_creator.func == SGD or getattr(cfg,'START_FROM_SGD',False):
         base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_sgd.pth')
         optim_state_dict_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
     else:

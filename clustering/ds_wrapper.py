@@ -33,6 +33,7 @@ class DsWrapper(torch.utils.data.Dataset):
         source_indexes = self.ds.source_indexes
 
         random.shuffle(source_indexes)
+        # todo: fix
         train_indexes = source_indexes[:int(len(self.ds)*0.8)]
         clustering_indexes = source_indexes[int(len(self.ds)*0.8):]+  self.ds.target_indexes
         print(f"train indexes is {len(train_indexes)}")
