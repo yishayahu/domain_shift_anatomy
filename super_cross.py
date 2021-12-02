@@ -23,13 +23,13 @@ def find_available_device():
                 gpu_utilize = nvmlDeviceGetUtilizationRates(h)
                 if info.free > wanted_free_mem and gpu_utilize.gpu < 1:
                     return f'cuda:{device_num}'
-            time.sleep(60)
             print('looking for device')
+            time.sleep(60)
     else:
         return 'cpu'
 
 def run_single_exp(exp,device,source,target,ts,sdice_path,stats):
-    print(f'training on source {source} target {target} exp {exp}')
+    print(f'training on source {source} target {target} exp {exp} on device {device}')
     sys.stdout = open(f'{exp}_logs.txt', 'w')
     os.system(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts}')
     sdice = np.mean(list(json.load(open(sdice_path)).values()))
@@ -67,6 +67,7 @@ def main():
                     os.rename(pp_optim,f'/home/dsi/shaya/data_splits/sources/source_{source}/optimizer_{adam_or_sgd}.pth')
                 sdice_path = f'/home/dsi/shaya/spottune_results/ts_size_{ts}/source_{source}_target_{target}/{exp}/test_metrics/sdice_score.json'
                 if not os.path.exists(sdice_path):
+                    print(f'lunch on source {source} target {target} exp {exp}')
                     p = Process(target=run_single_exp,args=(exp,find_available_device(),source,target,ts,sdice_path,stats))
                     running_now.append(p)
                     p.start()
