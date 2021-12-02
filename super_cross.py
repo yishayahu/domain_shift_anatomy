@@ -27,7 +27,7 @@ def find_available_device(my_devices):
                 if info.free > wanted_free_mem and gpu_utilize.gpu < 1:
                     return f'cuda:{device_num}'
             print(f'looking for device my device is {my_devices}')
-            time.sleep(60)
+            time.sleep(600)
     else:
         return 'cpu'
 
