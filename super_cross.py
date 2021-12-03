@@ -74,7 +74,7 @@ def main():
                     curr_device = find_available_device(my_devices)
                     print(f'training on source {source} to create {src_ckpt_path}')
                     my_devices.append(curr_device)
-                    os.system(f'python trainer.py --config only_source_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source')
+                    subprocess.run(f'python trainer.py --config only_source_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source >  errs_and_outs/only_source{source}_logs_out.txt 2> errs_and_outs/only_source{source}_logs_err.txt',shell=True,check=True)
                     my_devices.remove(curr_device)
                     pp_model = f'/home/dsi/shaya/spottune_results/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/model.pth'
                     os.rename(pp_model,src_ckpt_path)
@@ -90,6 +90,7 @@ def main():
                     p.start()
                     time.sleep(5)
                 else:
+                    print(f'loading exists on source {source} target {target} exp {exp}')
                     sdice = np.mean(list(json.load(open(sdice_path)).values()))
                     stats[exp][ts][f's_{source} t_{target}'] = sdice
     for place,p,ret_value in tqdm(running_now,desc='finishing running now'):
