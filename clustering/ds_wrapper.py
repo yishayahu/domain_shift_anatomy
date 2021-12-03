@@ -58,7 +58,7 @@ class DsWrapper(torch.utils.data.Dataset):
         self.item_to_domain = {}
 
         def feature_layer_hook(model, _, output):
-            if model.training and type(self.current_sampler) == RegularSampler and self.current_sampler.get_clustering_flag() != 'training':
+            if model.training and type(self.current_sampler) == RegularSampler:
                 assert output.shape[0] == len(self.new_indexes)
                 output = torch.nn.MaxPool2d(2)(output)
                 for i in range(output.shape[0]):
@@ -126,7 +126,7 @@ class DsWrapper(torch.utils.data.Dataset):
 
 
     def __getitem__(self, item):
-        if type(self.current_sampler) == RegularSampler and self.current_sampler.get_clustering_flag() != 'training':
+        if type(self.current_sampler) == RegularSampler:
             self.new_indexes.append(item)
         inp,lbl,domain = self.ds[item]
         self.item_to_domain[item] = domain
