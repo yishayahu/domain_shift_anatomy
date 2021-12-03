@@ -73,10 +73,11 @@ def main():
                 if not os.path.exists(src_ckpt_path):
                     curr_device = find_available_device(my_devices)
                     print(f'training on source {source} to create {src_ckpt_path}')
-                    my_devices.append(curr_device)
-                    subprocess.run(f'python trainer.py --config only_source_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source >  errs_and_outs/only_source{source}_logs_out.txt 2> errs_and_outs/only_source{source}_logs_err.txt',shell=True,check=True)
-                    my_devices.remove(curr_device)
                     pp_model = f'/home/dsi/shaya/spottune_results/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/model.pth'
+                    if not os.path.exists(pp_model):
+                        my_devices.append(curr_device)
+                        subprocess.run(f'python trainer.py --config only_source_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source >  errs_and_outs/only_source{source}_logs_out.txt 2> errs_and_outs/only_source{source}_logs_err.txt',shell=True,check=True)
+                        my_devices.remove(curr_device)
                     os.rename(pp_model,src_ckpt_path)
                     pp_optim = f'/home/dsi/shaya/spottune_results/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/optimizer.pth'
                     os.rename(pp_optim,f'/home/dsi/shaya/data_splits/sources/source_{source}/optimizer_{adam_or_sgd}.pth')
