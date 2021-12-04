@@ -1,10 +1,10 @@
+import itertools
 import json
 import multiprocessing
 import os
 import subprocess
 import sys
 import time
-from itertools import combinations
 import numpy as np
 from multiprocessing import Process
 
@@ -48,11 +48,11 @@ def main():
     if torch.cuda.is_available():
         nvmlInit()
     manager = multiprocessing.Manager()
-    sgd_exps = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer']
+    sgd_exps = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer','clustering','spot_with_grad']
     adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam', 'posttrain_continue_optimizer_adam','spot_with_grad_adam']
     experiments = adam_exps+sgd_exps
-    target_sizes = [2]#[1,2,4,8]
-    combs = list(combinations(list(range(6)), 2))
+    target_sizes = [1,2,4]
+    combs = list(itertools.combinations(list(range(6)), 2))
     stats = {}
 
     running_now = []
@@ -104,7 +104,8 @@ def main():
 
 
 def plot_stats(stats):
-    target_sizes = [2]
+    target_sizes = [1,2,4]
+    exit() # todo: exclude zeros from results
     def plot_stats_aux(sgd_or_adam):
         names = []
         means = []
