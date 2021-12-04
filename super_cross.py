@@ -9,6 +9,7 @@ import numpy as np
 from multiprocessing import Process
 
 import torch.cuda
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 from wandb.vendor.pynvml.pynvml import nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, \
     nvmlDeviceGetUtilizationRates, nvmlInit
@@ -99,6 +100,50 @@ def main():
         stats[place[0]][place[1]][place[2]] = ret_value.value
     print(stats)
     json.dump(stats,open('all_stats.json','w'))
+    return stats
+
+
+def plot_stats(stats):
+    target_sizes = [2]
+    def plot_stats_aux(sgd_or_adam):
+        names = []
+        means = []
+        errors = []
+        all1 = []
+        for size in target_sizes:
+            for exp_name, exp_stats in stats.items():
+                if sgd_or_adam == 'adam' and 'adam' not in exp_name:
+                    continue
+                if sgd_or_adam == 'sgd' and 'adam'  in exp_name:
+                    continue
+                all1.append((exp_name.split('_')[0],np.mean(list(stats[exp_name][size].values())),np.std(list(stats[exp_name][size].values()))))
+
+        for n,m,s in sorted(all1,key=lambda x:x[1]):
+            names.append(n)
+            means.append(m)
+            errors.append(s)
+
+        fig, ax = plt.subplots()
+        rects = ax.bar(list(range(len(names))), means, yerr=errors, align='center', alpha=0.5, ecolor='black', capsize=10)
+        ax.set_ylabel('sdice score')
+        ax.set_xticks(list(range(len(names))))
+        ax.set_xticklabels(names)
+        ax.yaxis.grid(True)
+
+        # Save the figure and show
+        plt.tight_layout()
+        for rect in rects:
+            height = rect.get_height()
+            ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
+                    '%.3f' % height,
+                    ha='center', va='bottom')
+        plt.savefig(f'bar_plot_with_error_{sgd_or_adam}.png')
+        plt.show()
+        plt.cla()
+        plt.clf()
+
+    plot_stats_aux('sgd')
+    plot_stats_aux('adam')
 
 if __name__ == '__main__':
-    main()
+    plot_stats(main())

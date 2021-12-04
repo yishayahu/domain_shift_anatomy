@@ -153,6 +153,7 @@ class CC359Ds(torch.utils.data.Dataset):
 
 
     def __getitem__(self, item):
+        x_patch_size = y_patch_size = np.array([256, 256])
         for (i,id1),(next_i,_) in zip(self.i_to_id,self.i_to_id[1:]+[(self.len_ds,None)]):
             if i <= item < next_i:
                 img = self.image_loader(id1)
@@ -165,7 +166,7 @@ class CC359Ds(torch.utils.data.Dataset):
                     img_slc = img[...,item-i]
                     seg_slc = seg[...,item-i]
 
-                img_slc,seg_slc = self.patch_func(img_slc,seg_slc,256,256)
+                img_slc,seg_slc = self.patch_func(img_slc,seg_slc,x_patch_size=x_patch_size,y_patch_size=y_patch_size)
                 img_slc,seg_slc = np.expand_dims(img_slc, axis=0),np.expand_dims(seg_slc, axis=0)
                 if not self.out_domain:
                     return img_slc,seg_slc

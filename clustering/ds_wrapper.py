@@ -128,8 +128,12 @@ class DsWrapper(torch.utils.data.Dataset):
     def __getitem__(self, item):
         if type(self.current_sampler) == RegularSampler:
             self.new_indexes.append(item)
-        inp,lbl,domain = self.ds[item]
-        self.item_to_domain[item] = domain
+        t = self.ds[item]
+        if len(t) == 2:
+            inp,lbl = t
+        else:
+            inp,lbl,domain = t
+            self.item_to_domain[item] = domain
         return inp,lbl
     def __len__(self):
         return len(self.ds)
