@@ -48,10 +48,10 @@ def main():
     if torch.cuda.is_available():
         nvmlInit()
     manager = multiprocessing.Manager()
-    sgd_exps = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer','clustering','spot_with_grad']
-    adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam', 'posttrain_continue_optimizer_adam','spot_with_grad_adam']
+    sgd_exps = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer','clustering']
+    adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','clustering_adam_start_from_sgd']
     experiments = adam_exps+sgd_exps
-    target_sizes = [1,2,4]
+    target_sizes = [2,1,4]
     combs = list(itertools.combinations(list(range(6)), 2))
     stats = {}
 
@@ -104,44 +104,65 @@ def main():
 
 
 def plot_stats(stats):
+    def get_common_couples(size,sgd_or_adam):
+        ks = [f's_{s} t_{t}' for s,t in itertools.combinations(range(6),2)]
+        for exp_name in stats.keys():
+            if sgd_or_adam == 'adam' and 'adam' not in exp_name:
+                continue
+            if sgd_or_adam == 'sgd' and 'adam'  in exp_name:
+                continue
+            not_in = [x for x in ks if x not in stats[exp_name][size].keys()]
+            for x in not_in:
+                ks.remove(x)
+        return ks
     target_sizes = [1,2,4]
-    exit() # todo: exclude zeros from results
+    n_to_s_sgd = {'posttrain':'base','gradual_tl':'g_DA','spottune':'st','posttrain_continue_optimizer':'c_o','clustering':'clus'}
+    n_to_s_adam = {'posttrain_adam':'base', 'gradual_tl_adam':'g_DA', 'spottune_adam':'st', 'posttrain_continue_optimizer_adam':'c_o','spot_with_grad_adam':'comb'}
+
+    # exit()
     def plot_stats_aux(sgd_or_adam):
-        names = []
-        means = []
-        errors = []
-        all1 = []
+
+
+        n_to_s =  n_to_s_sgd if sgd_or_adam =='sgd' else n_to_s_adam
         for size in target_sizes:
+            names = []
+            means = []
+            errors = []
+            all1 = []
+            ks = get_common_couples(size,sgd_or_adam)
+            print(f'len ks is {len(ks)}')
             for exp_name, exp_stats in stats.items():
+                curr_stats = [v for k,v in stats[exp_name][size].items() if v > 0 and k in ks]
                 if sgd_or_adam == 'adam' and 'adam' not in exp_name:
                     continue
                 if sgd_or_adam == 'sgd' and 'adam'  in exp_name:
                     continue
-                all1.append((exp_name.split('_')[0],np.mean(list(stats[exp_name][size].values())),np.std(list(stats[exp_name][size].values()))))
+                all1.append((n_to_s[exp_name],np.mean(list(curr_stats)),np.std(list(curr_stats))))
 
-        for n,m,s in sorted(all1,key=lambda x:x[1]):
-            names.append(n)
-            means.append(m)
-            errors.append(s)
+            for n,m,s in sorted(all1,key=lambda x:x[1]):
+                names.append(n)
+                means.append(m)
+                errors.append(s)
 
-        fig, ax = plt.subplots()
-        rects = ax.bar(list(range(len(names))), means, yerr=errors, align='center', alpha=0.5, ecolor='black', capsize=10)
-        ax.set_ylabel('sdice score')
-        ax.set_xticks(list(range(len(names))))
-        ax.set_xticklabels(names)
-        ax.yaxis.grid(True)
+            fig, ax = plt.subplots()
+            rects = ax.bar(list(range(len(names))), means, yerr=errors, align='center', alpha=0.5, ecolor='black', capsize=10)
+            ax.set_ylabel('sdice score')
+            ax.set_xticks(list(range(len(names))))
+            ax.set_xticklabels(names)
+            ax.yaxis.grid(True)
+            plt.title(f'{sgd_or_adam} size {size}')
 
-        # Save the figure and show
-        plt.tight_layout()
-        for rect in rects:
-            height = rect.get_height()
-            ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
-                    '%.3f' % height,
-                    ha='center', va='bottom')
-        plt.savefig(f'bar_plot_with_error_{sgd_or_adam}.png')
-        plt.show()
-        plt.cla()
-        plt.clf()
+            # Save the figure and show
+            plt.tight_layout()
+            for rect in rects:
+                height = rect.get_height()
+                ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
+                        '%.3f' % height,
+                        ha='center', va='bottom')
+            plt.savefig(f'bar_plot_with_error_{sgd_or_adam}.png')
+            plt.show()
+            plt.cla()
+            plt.clf()
 
     plot_stats_aux('sgd')
     plot_stats_aux('adam')

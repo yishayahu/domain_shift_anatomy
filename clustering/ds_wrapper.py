@@ -14,8 +14,9 @@ from clustering.regular_sampler import RegularSampler
 import numpy as np
 
 class DsWrapper(torch.utils.data.Dataset):
-    def __init__(self,model,dataset_creator,n_clusters,feature_layer_name,warmups,exp_name,decrease_center,exp_dir,**kwargs):
+    def __init__(self,model,dataset_creator,n_clusters,feature_layer_name,warmups,exp_name,decrease_center,exp_dir,no_loss,**kwargs):
         self.exp_dir = exp_dir
+        self.no_loss = no_loss
         #####
         kwargs['out_domain'] = True
         kwargs['exp_dir'] = exp_dir
@@ -122,6 +123,8 @@ class DsWrapper(torch.utils.data.Dataset):
 
         else:
             self.new_indexes = []
+        if self.no_loss:
+            loss[loss!=0] = 0
         return torch.mean(loss)
 
 
