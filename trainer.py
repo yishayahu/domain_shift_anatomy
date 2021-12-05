@@ -194,6 +194,10 @@ if __name__ == '__main__':
         print(optimizer.defaults.items())
         for k,v in optimizer.defaults.items():
             optimizer.param_groups[0][k] = v
+        from_step = int(getattr(cfg,'FROM_STEP',0))
+        if from_step > 0:
+            for param in optimizer.param_groups[0]['params']:
+                optimizer.state[param]['step'] = from_step
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
     if type(lr) == partial:
         lr = lr()
