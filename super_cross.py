@@ -25,7 +25,7 @@ def find_available_device(my_devices):
                 h = nvmlDeviceGetHandleByIndex(device_num)
                 info = nvmlDeviceGetMemoryInfo(h)
                 gpu_utilize = nvmlDeviceGetUtilizationRates(h)
-                if info.free > wanted_free_mem and gpu_utilize.gpu < 1:
+                if info.free > wanted_free_mem and gpu_utilize.gpu < 3:
                     return f'cuda:{device_num}'
             print(f'looking for device my device is {my_devices}')
             time.sleep(600)
