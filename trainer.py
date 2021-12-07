@@ -35,7 +35,7 @@ from spottunet.metric import evaluate_individual_metrics_probably_with_ids, comp
 from spottunet.split import one2one
 from dpipe.dataset.wrappers import apply, cache_methods
 from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri, CC359Ds
-from spottunet.paths import DATA_PATH, BASELINE_PATH
+from spottunet.paths import DATA_PATH
 from dpipe.im.metrics import dice_score
 from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch
 from dpipe.predict import add_extract_dims, divisible_shape

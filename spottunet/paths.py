@@ -2,7 +2,7 @@ from .utils import choose_root
 
 
 DATA_PATH = choose_root(
-    '/mnt/dsi_vol1/shaya_data/conp-dataset/projects/calgary-campinas/CC359'
+    '/home/dsi/shaya/cc359_data/CC359/'
 )
 
 BASELINE_PATH = choose_root(
