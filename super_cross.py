@@ -40,17 +40,19 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value):
         subprocess.run(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts} >  errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt 2> errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt',shell=True,check=True)
         sdice = np.mean(list(json.load(open(sdice_path)).values()))
         ret_value.value = sdice
+        os.remove('errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
+        os.remove('errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
     except subprocess.CalledProcessError:
         print(f'error in exp {exp}')
 
 
     my_devices.remove(device)
-def main():
+def main(only_stats=False):
     if torch.cuda.is_available():
         nvmlInit()
     manager = multiprocessing.Manager()
     sgd_exps = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer','clustering']
-    adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','clustering_adam_start_from_sgd']
+    adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','clustering_adam_start_from_sgd','gradual_tl__continue_optimzer_adam_from_step','posttrain_continue_optimizer_from_step_adam']
     experiments = adam_exps+sgd_exps
     target_sizes = [2,1,4]
     combs = list(itertools.combinations(list(range(6)), 2))
@@ -73,6 +75,8 @@ def main():
                 src_ckpt_path = f'/home/dsi/shaya/data_splits/sources/source_{source}/model_{adam_or_sgd}.pth'
 
                 if not os.path.exists(src_ckpt_path):
+                    if only_stats:
+                        continue
                     curr_device = find_available_device(my_devices)
                     print(f'training on source {source} to create {src_ckpt_path}')
                     pp_model = f'/home/dsi/shaya/spottune_results/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/model.pth'
@@ -85,6 +89,8 @@ def main():
                     os.rename(pp_optim,f'/home/dsi/shaya/data_splits/sources/source_{source}/optimizer_{adam_or_sgd}.pth')
                 sdice_path = f'/home/dsi/shaya/spottune_results/ts_size_{ts}/source_{source}_target_{target}/{exp}/test_metrics/sdice_score.json'
                 if not os.path.exists(sdice_path):
+                    if only_stats:
+                        continue
                     curr_device = find_available_device(my_devices)
                     exp_dir_path = f'/home/dsi/shaya/spottune_results/ts_size_{ts}/source_{source}_target_{target}/{exp}'
                     if os.path.exists(exp_dir_path):
@@ -123,8 +129,6 @@ def plot_stats(stats):
     target_sizes = [1,2,4]
     n_to_s_sgd = {'posttrain':'base','gradual_tl':'g_DA','spottune':'st','posttrain_continue_optimizer':'c_o','clustering':'clus'}
     n_to_s_adam = {'posttrain_adam':'base', 'gradual_tl_adam':'g_DA', 'spottune_adam':'st', 'posttrain_continue_optimizer_adam':'c_o','spot_with_grad_adam':'comb'}
-
-    # exit()
     def plot_stats_aux(sgd_or_adam):
 
 
@@ -173,4 +177,4 @@ def plot_stats(stats):
     plot_stats_aux('adam')
 
 if __name__ == '__main__':
-    plot_stats(main())
+    plot_stats(main(False))
