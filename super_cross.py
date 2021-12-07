@@ -51,9 +51,13 @@ def main(only_stats=False):
     if torch.cuda.is_available():
         nvmlInit()
     manager = multiprocessing.Manager()
-    sgd_exps = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer','clustering']
-    adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','clustering_adam_start_from_sgd','gradual_tl__continue_optimzer_adam_from_step','posttrain_continue_optimizer_from_step_adam']
-    experiments = adam_exps+sgd_exps
+    base_exps_sgd = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer']
+    base_exps_adam = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','posttrain_continue_optimizer_from_step_adam']
+    sgd_exps = ['clustering']
+    adam_exps = ['clustering_adam_start_from_sgd','gradual_tl__continue_optimzer_adam_from_step']
+    experiments1 = adam_exps+sgd_exps
+    experiments_base = base_exps_sgd+base_exps_adam
+    experiments =  experiments_base
     target_sizes = [2,1,4]
     combs = list([(0, 1), (1, 4), (2, 3), (3, 5), (4, 5), (0, 2)])
     stats = {}
