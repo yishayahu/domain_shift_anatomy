@@ -40,8 +40,8 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value):
         subprocess.run(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts} >  errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt 2> errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt',shell=True,check=True)
         sdice = np.mean(list(json.load(open(sdice_path)).values()))
         ret_value.value = sdice
-        os.remove('errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
-        os.remove('errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
+        os.remove(f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
+        os.remove(f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
     except subprocess.CalledProcessError:
         print(f'error in exp {exp}')
 
