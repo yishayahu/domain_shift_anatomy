@@ -55,7 +55,7 @@ def main(only_stats=False):
     adam_exps = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','clustering_adam_start_from_sgd','gradual_tl__continue_optimzer_adam_from_step','posttrain_continue_optimizer_from_step_adam']
     experiments = adam_exps+sgd_exps
     target_sizes = [2,1,4]
-    combs = list(itertools.combinations(list(range(6)), 2))
+    combs = list([(0, 1), (1, 4), (2, 3), (3, 5), (4, 0), (0, 2)])
     stats = {}
 
     running_now = []
