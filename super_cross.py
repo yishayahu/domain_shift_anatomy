@@ -39,9 +39,8 @@ def find_available_device(my_devices,running_now):
 def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value):
     my_devices.append(device)
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
-    with tempfile.TemporaryFile() as out_file, tempfile.TemporaryFile() as err_file:
+    with tempfile.NamedTemporaryFile() as out_file, tempfile.NamedTemporaryFile() as err_file:
         try:
-
             subprocess.run(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts} >  {out_file.name} 2> {err_file.name}',shell=True,check=True)
             sdice = np.mean(list(json.load(open(sdice_path)).values()))
             ret_value.value = sdice
