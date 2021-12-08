@@ -96,8 +96,6 @@ def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[floa
         for _ in range(batches_per_epoch):
             from_target = min((epoch//4)+ 1,batch_size-1)
             from_source = batch_size - from_target
-            print(f'some info from load epoch = {epoch} from source = {from_source} from target  = {from_target}')
-
             for _ in range(from_target):
                 yield squeeze_first(tuple(pam(loaders, next(target_iter))))
             for _ in range(from_source):
