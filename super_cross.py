@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import numpy as np
 from multiprocessing import Process
@@ -36,14 +37,16 @@ def find_available_device(my_devices):
 def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value):
     my_devices.append(device)
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
-    try:
-        subprocess.run(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts} >  errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt 2> errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt',shell=True,check=True)
-        sdice = np.mean(list(json.load(open(sdice_path)).values()))
-        ret_value.value = sdice
-        os.remove(f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
-        os.remove(f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
-    except subprocess.CalledProcessError:
-        print(f'error in exp {exp}')
+    with tempfile.TemporaryFile() as out_file, tempfile.TemporaryFile() as err_file:
+        try:
+
+            subprocess.run(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts} >  {out_file.name} 2> {err_file.name}',shell=True,check=True)
+            sdice = np.mean(list(json.load(open(sdice_path)).values()))
+            ret_value.value = sdice
+        except subprocess.CalledProcessError:
+            print(f'error in exp {exp}_{source}_{target}_{ts}')
+            os.rename(err_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
+            os.rename(out_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
 
 
     my_devices.remove(device)
