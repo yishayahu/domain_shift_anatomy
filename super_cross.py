@@ -55,15 +55,15 @@ def main(only_stats=False):
     if torch.cuda.is_available():
         nvmlInit()
     manager = multiprocessing.Manager()
-    base_exps_sgd = ['posttrain','gradual_tl','spottune','posttrain_continue_optimizer']
-    base_exps_adam = ['posttrain_adam', 'gradual_tl_adam', 'spottune_adam','posttrain_continue_optimizer_from_step_adam']
-    sgd_exps = ['clustering']
-    adam_exps = ['clustering_adam_start_from_sgd','gradual_tl__continue_optimzer_adam_from_step']
-    experiments1 = adam_exps+sgd_exps
+    base_exps_sgd = ['posttrain','spottune','posttrain_continue_optimizer','gradual_tl']
+    base_exps_adam = ['posttrain_adam', 'spottune_adam', 'gradual_tl_adam','posttrain_continue_optimizer_from_step_adam','gradual_tl__continue_optimzer_adam_from_step']
+    # sgd_exps = ['clustering']
+    # adam_exps = ['clustering_adam_start_from_sgd']
+    # experiments1 = adam_exps+sgd_exps
     experiments_base = base_exps_sgd+base_exps_adam
-    experiments =  experiments_base+experiments1
+    experiments =  experiments_base
     target_sizes = [2,1,4]
-    combs = list([(0, 1), (1, 4), (2, 3), (3, 5), (4, 5), (0, 2)])
+    combs = itertools.combinations(range(6),2)
     stats = {}
 
     running_now = []
@@ -150,8 +150,16 @@ def plot_stats(stats):
                 ks.remove(x)
         return ks
     target_sizes = [1,2,4]
-    n_to_s_sgd = {'posttrain':'base','gradual_tl':'g_DA','spottune':'st','posttrain_continue_optimizer':'c_o','clustering':'clus'}
-    n_to_s_adam = {'posttrain_adam':'base', 'gradual_tl_adam':'g_DA', 'spottune_adam':'st', 'posttrain_continue_optimizer_adam':'c_o','spot_with_grad_adam':'comb'}
+    stats['oracle_sgd'] ={}
+    stats['oracle_adam'] ={}
+    for size in target_sizes:
+        stats['oracle_sgd'][size] = {'s_0 t_1':0.84, 's_1 t_4':0.86, 's_2 t_3':0.857, 's_3 t_5':0.836, 's_4 t_5':0.857, 's_0 t_2':0.84}
+        stats['oracle_adam'][size] = {'s_0 t_1':0.95, 's_1 t_4':0.935, 's_2 t_3':0.95, 's_3 t_5':0.945, 's_4 t_5':0.952, 's_0 t_2':0.95}
+    n_to_s_sgd = {'posttrain':'base','gradual_tl':'g_DA','spottune':'st','posttrain_continue_optimizer':'c_o','clustering':'clus','oracle_sgd':'oracle'}
+    n_to_s_adam = {'posttrain_adam':'base', 'gradual_tl_adam':'g_DA', 'spottune_adam':'st', 'posttrain_continue_optimizer_adam':'c_o','spot_with_grad_adam':'comb',
+                   'posttrain_continue_optimizer_from_step_adam':'c_o_fs',
+                   'gradual_tl__continue_optimzer_adam_from_step':'g_da_co_fs','oracle_adam':'oracle'}
+
     def plot_stats_aux(sgd_or_adam):
 
 
@@ -171,17 +179,17 @@ def plot_stats(stats):
                     continue
                 all1.append((n_to_s[exp_name],np.mean(list(curr_stats)),np.std(list(curr_stats))))
 
-            for n,m,s in sorted(all1,key=lambda x:x[1]):
+            for n,m,s in all1:
                 names.append(n)
                 means.append(m)
                 errors.append(s)
+            print(f'ts {size}, means {means},erros {errors}')
 
             fig, ax = plt.subplots()
-            rects = ax.bar(list(range(len(names))), means, yerr=errors, align='center', alpha=0.5, ecolor='black', capsize=10)
+            rects = ax.bar(list(range(len(names))), means, yerr=errors, align='center', alpha=0.8, ecolor='black', capsize=10,color=['b','g','r','y','m'])
             ax.set_ylabel('sdice score')
             ax.set_xticks(list(range(len(names))))
             ax.set_xticklabels(names)
-            ax.yaxis.grid(True)
             plt.title(f'{sgd_or_adam} size {size}')
 
             # Save the figure and show
