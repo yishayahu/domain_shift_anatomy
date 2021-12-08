@@ -102,7 +102,7 @@ def main(only_stats=False):
                     curr_device = find_available_device(my_devices,running_now)
                     exp_dir_path = f'/home/dsi/shaya/spottune_results/ts_size_{ts}/source_{source}_target_{target}/{exp}'
                     if os.path.exists(os.path.join(exp_dir_path,'.lock')):
-                        print('source {source} target {target} exp {exp} is locked' )
+                        print(f'source {source} target {target} exp {exp} is locked' )
                         continue
                     print(f'lunch on source {source} target {target} exp {exp}')
                     ret_value = multiprocessing.Value("d", 0.0, lock=False)
@@ -119,11 +119,11 @@ def main(only_stats=False):
         still_running = []
         places = []
         for place,p,ret_value in tqdm(running_now,desc='finishing running now'):
-            poll = p.poll()
-            if poll is None:
+            p.join(timeout=0)
+            if p.is_alive():
                 still_running.append(p)
                 places.append(place)
-                # p.subprocess is alive
+
             else:
                 stats[place[0]][place[1]][place[2]] = ret_value.value
         running_now = still_running
