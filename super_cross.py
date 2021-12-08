@@ -46,8 +46,8 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value):
             ret_value.value = sdice
         except subprocess.CalledProcessError:
             print(f'error in exp {exp}_{source}_{target}_{ts}')
-            os.rename(err_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
-            os.rename(out_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
+            shutil.copy(err_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
+            shutil.copy(out_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
 
 
     my_devices.remove(device)
