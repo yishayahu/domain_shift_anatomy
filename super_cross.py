@@ -17,7 +17,7 @@ from wandb.vendor.pynvml.pynvml import nvmlDeviceGetCount, nvmlDeviceGetHandleBy
     nvmlDeviceGetUtilizationRates, nvmlInit
 
 
-def find_available_device(my_devices):
+def find_available_device(my_devices,running_now):
     if torch.cuda.is_available():
         wanted_free_mem = 8 * 2 ** 30  # at least 16 GB avail
         while True:
@@ -30,6 +30,8 @@ def find_available_device(my_devices):
                 if info.free > wanted_free_mem and gpu_utilize.gpu < 3:
                     return f'cuda:{device_num}'
             print(f'looking for device my device is {my_devices}')
+            places = [x[0] for x in running_now]
+            print(places)
             time.sleep(600)
     else:
         return 'cpu'
@@ -84,7 +86,7 @@ def main(only_stats=False):
                 if not os.path.exists(src_ckpt_path):
                     if only_stats:
                         continue
-                    curr_device = find_available_device(my_devices)
+                    curr_device = find_available_device(my_devices,running_now)
                     print(f'training on source {source} to create {src_ckpt_path}')
                     pp_model = f'/home/dsi/shaya/spottune_results/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/model.pth'
                     if not os.path.exists(pp_model):
@@ -98,7 +100,7 @@ def main(only_stats=False):
                 if not os.path.exists(sdice_path):
                     if only_stats:
                         continue
-                    curr_device = find_available_device(my_devices)
+                    curr_device = find_available_device(my_devices,running_now)
                     exp_dir_path = f'/home/dsi/shaya/spottune_results/ts_size_{ts}/source_{source}_target_{target}/{exp}'
                     if os.path.exists(exp_dir_path):
                         print(f'removing {exp_dir_path}')
@@ -113,9 +115,21 @@ def main(only_stats=False):
                     print(f'loading exists on source {source} target {target} exp {exp}')
                     sdice = np.mean(list(json.load(open(sdice_path)).values()))
                     stats[exp][ts][f's_{source} t_{target}'] = sdice
-    for place,p,ret_value in tqdm(running_now,desc='finishing running now'):
-        p.join()
-        stats[place[0]][place[1]][place[2]] = ret_value.value
+    still_running = running_now
+    while still_running:
+        still_running = []
+        places = []
+        for place,p,ret_value in tqdm(running_now,desc='finishing running now'):
+            poll = p.poll()
+            if poll is None:
+                still_running.append(p)
+                places.append(place)
+                # p.subprocess is alive
+            else:
+                stats[place[0]][place[1]][place[2]] = ret_value.value
+        running_now = still_running
+        print(places)
+        time.sleep(600)
     print(stats)
     json.dump(stats,open('all_stats.json','w'))
     return stats
