@@ -128,7 +128,8 @@ def main(only_stats=False):
                 stats[place[0]][place[1]][place[2]] = ret_value.value
         running_now = still_running
         print(places)
-        time.sleep(600)
+        if running_now:
+            time.sleep(600)
     print(stats)
     json.dump(stats,open('all_stats.json','w'))
     return stats
