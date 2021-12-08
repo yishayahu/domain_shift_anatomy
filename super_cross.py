@@ -104,6 +104,8 @@ def main(only_stats=False):
                     if os.path.exists(os.path.join(exp_dir_path,'.lock')):
                         print(f'source {source} target {target} exp {exp} is locked' )
                         continue
+                    if os.path.exists(exp_dir_path):
+                        shutil.rmtree(exp_dir_path)
                     print(f'lunch on source {source} target {target} exp {exp}')
                     ret_value = multiprocessing.Value("d", 0.0, lock=False)
                     p = Process(target=run_single_exp,args=(exp,curr_device,source,target,ts,sdice_path,my_devices,ret_value))
@@ -121,7 +123,7 @@ def main(only_stats=False):
         for place,p,ret_value in tqdm(running_now,desc='finishing running now'):
             p.join(timeout=0)
             if p.is_alive():
-                still_running.append(p)
+                still_running.append((place,p,ret_value))
                 places.append(place)
 
             else:
