@@ -102,9 +102,6 @@ def main(only_stats=False):
                         continue
                     curr_device = find_available_device(my_devices,running_now)
                     exp_dir_path = f'/home/dsi/shaya/spottune_results/ts_size_{ts}/source_{source}_target_{target}/{exp}'
-                    if os.path.exists(exp_dir_path):
-                        print(f'removing {exp_dir_path}')
-                        shutil.rmtree(exp_dir_path)
                     print(f'lunch on source {source} target {target} exp {exp}')
                     ret_value = multiprocessing.Value("d", 0.0, lock=False)
                     p = Process(target=run_single_exp,args=(exp,curr_device,source,target,ts,sdice_path,my_devices,ret_value))
