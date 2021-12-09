@@ -5,7 +5,11 @@ import random
 import numpy
 import torch
 from sklearn.cluster import  KMeans
-from cuml.manifold import TSNE
+try:
+    from cuml.manifold import TSNE
+except ModuleNotFoundError:
+    from sklearn.manifold import TSNE
+
 
 from tqdm import tqdm
 
