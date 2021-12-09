@@ -5,13 +5,14 @@ import random
 import numpy
 import torch
 from sklearn.cluster import  KMeans
-from tsnecuda import TSNE
+from cuml.manifold import TSNE
 
 from tqdm import tqdm
 
 from clustering.clustered_sampler import ClusteredSampler
 from clustering.regular_sampler import RegularSampler
 import numpy as np
+import gc
 
 class DsWrapper(torch.utils.data.Dataset):
     def __init__(self,model,dataset_creator,n_clusters,feature_layer_name,warmups,exp_name,decrease_center,exp_dir,no_loss,**kwargs):
@@ -94,8 +95,10 @@ class DsWrapper(torch.utils.data.Dataset):
                 pickle.dump(self.indexes,open(os.path.join(self.exp_dir,'indexes.p'),'wb'))
                 for i in tqdm(range(16),desc='running on i'):
                     for j in tqdm(range(16),desc='running on j'):
+                        gc.collect()
                         t = TSNE(n_components=2)
-                        X.append(t.fit_transform(self.arrays[:,:,i,j]))
+                        arrs = self.arrays[:,:,i,j].copy()
+                        X.append(t.fit_transform(arrs))
                 self.arrays = np.concatenate(X,axis=1)
                 pickle.dump(self.arrays,open(os.path.join(self.exp_dir,'array_after_tsne.p'),'wb'))
                 labels = self.clustering_algorithm.fit_predict(self.arrays)

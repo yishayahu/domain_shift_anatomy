@@ -158,7 +158,7 @@ def plot_stats(stats):
     n_to_s_sgd = {'posttrain':'base','gradual_tl':'g_DA','spottune':'st','posttrain_continue_optimizer':'c_o','clustering':'clus','oracle_sgd':'oracle'}
     n_to_s_adam = {'posttrain_adam':'base', 'gradual_tl_adam':'g_DA', 'spottune_adam':'st', 'posttrain_continue_optimizer_adam':'c_o','spot_with_grad_adam':'comb',
                    'posttrain_continue_optimizer_from_step_adam':'c_o_fs',
-                   'gradual_tl__continue_optimzer_adam_from_step':'g_da_co_fs','oracle_adam':'oracle'}
+                   'gradual_tl__continue_optimzer_adam_from_step':'g_da_co_fs','oracle_adam':'oracle','clustering_adam_start_from_sgd':'clus'}
 
     def plot_stats_aux(sgd_or_adam):
 
