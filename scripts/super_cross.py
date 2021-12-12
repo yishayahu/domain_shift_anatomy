@@ -42,7 +42,9 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
     with tempfile.NamedTemporaryFile() as out_file, tempfile.NamedTemporaryFile() as err_file:
         try:
-            subprocess.run(f'CUDA_VISIBLE_DEVICES={device} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}',shell=True,check=True)
+            cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}'
+            print(cmd)
+            subprocess.run(cmd,shell=True,check=True)
             sdice = np.mean(list(json.load(open(sdice_path)).values()))
             ret_value.value = sdice
         except subprocess.CalledProcessError:
@@ -138,8 +140,8 @@ def main():
     opts = cli.parse_args()
     if opts.msm:
 
-        experiments = ['posttrain_msm','gradual_tl_msm']
-        combs = [(0,2)]
+        experiments = ['posttrain_msm_adam','gradual_tl_msm_adam']
+        combs = [(0,1)]
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
     else:
