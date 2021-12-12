@@ -76,6 +76,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric, onl
                     continue
                 adam_or_sgd = 'adam' if 'adam' in exp else 'sgd'
                 msm = '_msm' if 'msm' in exp else ''
+                last_ckpt = '39' if 'msm' in exp else '59'
                 src_ckpt_path = f'{data_split_path}/sources/source_{source}/model_{adam_or_sgd}.pth'
 
                 if not os.path.exists(src_ckpt_path):
@@ -83,13 +84,13 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric, onl
                         continue
                     curr_device = find_available_device(my_devices,running_now)
                     print(f'training on source {source} to create {src_ckpt_path}')
-                    pp_model = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/model.pth'
+                    pp_model = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_{last_ckpt}/model.pth'
                     if not os.path.exists(pp_model):
                         my_devices.append(curr_device)
                         subprocess.run(f'python trainer.py --config only_source{msm}_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source >  errs_and_outs/only_source{source}_logs_out.txt 2> errs_and_outs/only_source{source}_logs_err.txt',shell=True,check=True)
                         my_devices.remove(curr_device)
                     os.rename(pp_model,src_ckpt_path)
-                    pp_optim = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_59/optimizer.pth'
+                    pp_optim = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_{last_ckpt}/optimizer.pth'
                     os.rename(pp_optim,f'{data_split_path}/sources/source_{source}/optimizer_{adam_or_sgd}.pth')
                 sdice_path = f'{res_path}/ts_size_{ts}/source_{source}_target_{target}/{exp}/test_metrics/{metric}.json'
                 if not os.path.exists(sdice_path):
