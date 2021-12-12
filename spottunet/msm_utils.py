@@ -1,3 +1,5 @@
+from dpipe.io import save_json
+
 from spottunet import paths
 
 import torch
@@ -118,9 +120,19 @@ def compute_metrics_msm(ids,predict):
     dice_avg = np.mean(dice, axis=0).tolist()[0]
     asd_avg = np.mean(asd)
 
-    print("dice_avg_student %.4f" % (dice_avg))
-    print("asd_avg_student %.4f" % (asd_avg))
+    print("dice_avg %.4f" % (dice_avg))
 
     return {'dice':float(dice_avg),'asd':float(asd_avg)}
+
+
+def compute_metrics_for_test(ids,predict,results_path,best='',logger=None):
+    os.makedirs(results_path, exist_ok=False)
+
+    results = compute_metrics_msm(ids,predict)
+
+    for metric_name, result in results.items():
+        save_json(result, os.path.join(results_path, metric_name + '.json'), indent=0)
+        if logger is not None:
+            logger.value(f'test_{metric_name}{best}',result)
 
 

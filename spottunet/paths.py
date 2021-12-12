@@ -7,7 +7,7 @@ DATA_PATH = choose_root(
 
 
 MSM_DATA_PATH = choose_root(
-    '/mnt/dsi_vol1/multiSiteMRI/'
+    '/home/dsi/shaya/multiSiteMRI/'
 )
 BASELINE_PATH = choose_root(
     '/home/dsi/shaya/domain_shift_anatomy/exp',

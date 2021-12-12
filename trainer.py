@@ -2,7 +2,7 @@ import argparse
 import os
 import shutil
 from pathlib import Path
-from torch.optim import Adam,SGD
+from torch.optim import *
 import dpipe.commands as commands
 import numpy as np
 import torch
@@ -19,8 +19,8 @@ from dpipe.torch import save_model_state, load_model_state, inference_step
 
 from clustering.dataloader_wrapper import DataLoaderWrapper
 from clustering.ds_wrapper import DsWrapper
-from spottunet.dataset.multiSiteMri import MultiSiteMri, MultiSiteDl
-from spottunet.msm_utils import compute_metrics_msm
+from spottunet.dataset.multiSiteMri import MultiSiteMri, MultiSiteDl, InfiniteLoader
+from spottunet.msm_utils import compute_metrics_msm, compute_metrics_for_test
 from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
@@ -323,8 +323,9 @@ if __name__ == '__main__':
             num_workers=0, pin_memory=True, sampler=train_dataset.current_sampler)
         train_kwargs['batch_iter_step'] = batch_iter
     elif msm:
-        batch_iter = MultiSiteDl(dataset, batch_size=batch_size, shuffle=True, num_workers=0,
-                                                 pin_memory=True)
+
+        batch_iter = InfiniteLoader(MultiSiteDl(dataset, batch_size=batch_size, shuffle=True, num_workers=0,
+                                                pin_memory=True),batches_per_epoch=batches_per_epoch)
 
 
     else:
@@ -350,7 +351,7 @@ if __name__ == '__main__':
     )
     predict_to_dir = skip_predict
     if msm:
-        evaluate_individual_metrics = partial(compute_metrics_msm,ids=test_ids,predict=predict)
+        evaluate_individual_metrics = partial(compute_metrics_for_test,ids=test_ids,predict=predict,logger=logger)
     else:
         final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
         evaluate_individual_metrics = partial(

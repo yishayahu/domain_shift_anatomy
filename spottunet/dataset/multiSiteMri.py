@@ -113,6 +113,27 @@ class MultiSiteMri(torch.utils.data.Dataset):
 
 
 
+class InfiniteLoader:
+    def __init__(self,dl,batches_per_epoch):
+        self.dl = dl
+        self.batches_per_epoch = batches_per_epoch
+    def __iter__(self):
+        self.batch_idx = 0
+        self.iter = iter(self.dl)
+        return self
+    def __call__(self):
+        return self
+    def __next__(self):
+        self.batch_idx+=1
+        if self.batch_idx > self.batches_per_epoch:
+            raise StopIteration()
+        try:
+            return next(self.iter)
+        except StopIteration:
+            self.iter = iter(self.dl)
+            return next(self.iter)
+
+
 class MultiSiteDl(torch.utils.data.DataLoader):
     def __call__(self):
         return self
