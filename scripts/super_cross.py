@@ -136,7 +136,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric, onl
 
 def main():
     cli = argparse.ArgumentParser()
-    cli.add_argument("--msm", default='debug')
+    cli.add_argument("--msm", action='store_true')
     opts = cli.parse_args()
     if opts.msm:
 
