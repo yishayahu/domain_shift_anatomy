@@ -41,7 +41,7 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value):
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
     with tempfile.NamedTemporaryFile() as out_file, tempfile.NamedTemporaryFile() as err_file:
         try:
-            subprocess.run(f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} --ts_size {ts} >  {out_file.name} 2> {err_file.name}',shell=True,check=True)
+            subprocess.run(f'CUDA_VISIBLE_DEVICES={device} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --target {target} --ts_size {ts} >  {out_file.name} 2> {err_file.name}',shell=True,check=True)
             sdice = np.mean(list(json.load(open(sdice_path)).values()))
             ret_value.value = sdice
         except subprocess.CalledProcessError:
