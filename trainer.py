@@ -19,6 +19,8 @@ from dpipe.torch import save_model_state, load_model_state, inference_step
 
 from clustering.dataloader_wrapper import DataLoaderWrapper
 from clustering.ds_wrapper import DsWrapper
+from spottunet.dataset.multiSiteMri import MultiSiteMri, MultiSiteDl
+from spottunet.msm_utils import compute_metrics_msm
 from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
@@ -35,7 +37,7 @@ from spottunet.metric import evaluate_individual_metrics_probably_with_ids, comp
 from spottunet.split import one2one
 from dpipe.dataset.wrappers import apply, cache_methods
 from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri, CC359Ds
-from spottunet.paths import DATA_PATH
+from spottunet.paths import *
 from dpipe.im.metrics import dice_score
 from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch
 from dpipe.predict import add_extract_dims, divisible_shape
@@ -90,16 +92,23 @@ if __name__ == '__main__':
     opts = cli.parse_args()
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
+    msm = getattr(cfg,'MSM',False)
+    if msm:
+        base_res_dir = msm_res_dir
+        base_split_dir = msm_splits_dir
+    else:
+        base_res_dir = st_res_dir
+        base_split_dir = st_splits_dir
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
     if opts.train_only_source:
-        exp_dir = os.path.join(opts.base_res_dir,f'source_{opts.source}',opts.exp_name)
-        splits_dir =  os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}')
+        exp_dir = os.path.join(base_res_dir,f'source_{opts.source}',opts.exp_name)
+        splits_dir =  os.path.join(base_split_dir,'sources',f'source_{opts.source}')
         opts.target = None
         opts.ts_size = None
     else:
-        exp_dir = os.path.join(opts.base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
-        splits_dir =  os.path.join(opts.base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
+        exp_dir = os.path.join(base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
+        splits_dir =  os.path.join(base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
     Path(exp_dir).mkdir(parents=True,exist_ok=True)
     log_path = os.path.join(exp_dir,'train_logs')
     saved_model_path = os.path.join(exp_dir,'model.pth')
@@ -113,7 +122,7 @@ if __name__ == '__main__':
 
     train_ids = load(os.path.join(splits_dir,'train_ids.json'))
     if getattr(cfg,'ADD_SOURCE_IDS',False):
-        train_ids = load(os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','train_ids.json')) + train_ids
+        train_ids = load(os.path.join(base_split_dir,'sources',f'source_{opts.source}','train_ids.json')) + train_ids
     test_ids = load(os.path.join(splits_dir,'test_ids.json'))
     if getattr(cfg,'TRAIN_ON_TEST',False):
         train_ids = test_ids
@@ -131,18 +140,20 @@ if __name__ == '__main__':
 
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     if optimizer_creator.func == SGD or getattr(cfg,'START_FROM_SGD',False):
-        base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_sgd.pth')
-        optim_state_dict_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
+        base_ckpt_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','model_sgd.pth')
+        optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
     else:
         assert optimizer_creator.func == Adam
-        base_ckpt_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','model_adam.pth')
-        optim_state_dict_path = os.path.join(opts.base_split_dir,'sources',f'source_{opts.source}','optimizer_adam.pth')
+        base_ckpt_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','model_adam.pth')
+        optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_adam.pth')
     batch_size = 16
     lr_init = 1e-3
     if opts.train_only_source:
         project = f'spot_s{opts.source}'
     else:
         project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
+    if msm:
+        project = 'msm'+ project[4:]
 
     if opts.exp_name == 'debug':
         print('debug mode')
@@ -157,11 +168,13 @@ if __name__ == '__main__':
 
     print(f'running {opts.exp_name}')
 
+    if not msm:
+        voxel_spacing = (1, 0.95, 0.95)
 
-    voxel_spacing = (1, 0.95, 0.95)
-
-    preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
-    dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
+        preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
+        dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
+    else:
+        dataset = MultiSiteMri(train_ids)
 
     seed = 0xBadCafe
 
@@ -172,9 +185,10 @@ if __name__ == '__main__':
     sdice_metric = lambda x, y, i: sdice(get_pred(x), get_pred(y), dataset.load_spacing(i), sdice_tolerance)
     val_metrics = {'dice_score': partial(aggregate_metric_probably_with_ids, metric=dice_metric),
                    'sdice_score': partial(aggregate_metric_probably_with_ids, metric=sdice_metric)}
-
-
-    architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
+    n_chans_in = 1
+    if msm:
+        n_chans_in = 3
+    architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
     if not opts.train_only_source:
@@ -205,7 +219,7 @@ if __name__ == '__main__':
     if spot or opts.train_only_source:
         reference_architecture = None
     else:
-        reference_architecture = UNet2D(n_chans_in=1, n_chans_out=1, n_filters_init=16)
+        reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
 
@@ -213,22 +227,32 @@ if __name__ == '__main__':
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
-
+    if msm:
+        metric_to_use = 'dice'
+    else:
+        metric_to_use = 'sdice_score'
 
     if spot:
         architecture_policy = resnet(num_class=64)
         architecture_policy.to(device)
         temperature = 0.1
         use_gumbel_inference = False
-        @slicewise  # 3D -> 2D iteratively
-        @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
-        @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
-        def predict(image):
-            return inference_step_spottune(image, architecture_main=architecture, architecture_policy=architecture_policy,
-                                           activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference,soft=cfg.SOFT)
-        validate_step = partial(compute_metrics_probably_with_ids_spottune, predict=predict,
-                                load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics,
-                                architecture_main=architecture)
+
+        if not msm:
+            @slicewise  # 3D -> 2D iteratively
+            @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
+            @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
+            def predict(image):
+                return inference_step_spottune(image, architecture_main=architecture, architecture_policy=architecture_policy,
+                                               activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference,soft=cfg.SOFT)
+            validate_step = partial(compute_metrics_probably_with_ids_spottune, predict=predict,
+                                    load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics,
+                                    architecture_main=architecture)
+        else:
+            def predict(image):
+                return inference_step_spottune(image, architecture_main=architecture, architecture_policy=architecture_policy,
+                                               activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference,soft=cfg.SOFT)
+            validate_step = partial(compute_metrics_msm,ids=val_ids,predict=predict)
         lr_init_policy = 0.01
         lr_policy = Schedule(initial=lr_init_policy, epoch2value_multiplier={45: 0.1, })
         optimizer_policy = torch.optim.Adam(
@@ -245,18 +269,24 @@ if __name__ == '__main__':
             **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
             'model.pth': architecture, 'model_policy.pth': architecture_policy,
             'optimizer.pth': optimizer, 'optimizer_policy.pth': optimizer_policy
-        })
+        },metric_to_use=metric_to_use)
         train_step_func = train_step_spottune
 
     else:
-        @slicewise  # 3D -> 2D iteratively
-        @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
-        @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
-        def predict(image):
-            return inference_step(image, architecture=architecture, activation=torch.sigmoid)
 
-        validate_step = partial(compute_metrics_probably_with_ids if opts.exp_name != 'debug' else empty_dict_func, predict=predict,
-                                load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
+        if not msm:
+            @slicewise  # 3D -> 2D iteratively
+            @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
+            @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
+            def predict(image):
+                return inference_step(image, architecture=architecture, activation=torch.sigmoid)
+            validate_step = partial(compute_metrics_probably_with_ids if opts.exp_name != 'debug' else empty_dict_func, predict=predict,
+                                    load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
+        else:
+            def predict(image):
+                return inference_step(image, architecture=architecture, activation=torch.sigmoid)
+            validate_step = partial(compute_metrics_msm,ids=val_ids,predict=predict)
+
         lr_policy = None
         architecture_policy = None
         optimizer_policy = None
@@ -267,7 +297,7 @@ if __name__ == '__main__':
         checkpoints = CheckpointsWithBest(checkpoints_path, {
             **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
             'model.pth': architecture, 'optimizer.pth': optimizer
-        })
+        },metric_to_use=metric_to_use)
         train_step_func = train_step
 
 
@@ -292,6 +322,10 @@ if __name__ == '__main__':
             dataset =train_dataset, batch_size=batch_size,
             num_workers=0, pin_memory=True, sampler=train_dataset.current_sampler)
         train_kwargs['batch_iter_step'] = batch_iter
+    elif msm:
+        batch_iter = MultiSiteDl(dataset, batch_size=batch_size, shuffle=True, num_workers=0,
+                                                 pin_memory=True)
+
 
     else:
         batch_iter = Infinite(
@@ -314,18 +348,20 @@ if __name__ == '__main__':
         training_policy=training_policy,
         **train_kwargs
     )
-
     predict_to_dir = skip_predict
-    final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
-    evaluate_individual_metrics = partial(
-        evaluate_individual_metrics_probably_with_ids_no_pred,
-        load_y=dataset.load_segm,
-        load_x=dataset.load_image,
-        predict=predict,
-        metrics=final_metrics,
-        test_ids=test_ids,
-        logger=logger
-    )
+    if msm:
+        evaluate_individual_metrics = partial(compute_metrics_msm,ids=test_ids,predict=predict)
+    else:
+        final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
+        evaluate_individual_metrics = partial(
+            evaluate_individual_metrics_probably_with_ids_no_pred,
+            load_y=dataset.load_segm,
+            load_x=dataset.load_image,
+            predict=predict,
+            metrics=final_metrics,
+            test_ids=test_ids,
+            logger=logger
+        )
     fix_seed(seed=0xBAAAAAAD)
     freeze_func(architecture)
     if spot:

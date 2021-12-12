@@ -5,9 +5,10 @@ from dpipe.io import PathLike
 from typing import Dict, Any, Union, Iterable, Sequence
 
 class CheckpointsWithBest(Checkpoints):
-    def __init__(self, base_path: PathLike, objects: Union[Iterable, Dict[PathLike, Any]]):
+    def __init__(self, base_path: PathLike, objects: Union[Iterable, Dict[PathLike, Any]],metric_to_use='sdice_score'):
         super().__init__(base_path, objects)
         self.best_so_far = -1
+        self.metric_to_use = metric_to_use
 
     def _get_best_checkpoint_folder(self):
         return self.base_path / f'{self._checkpoint_prefix}_best'
@@ -16,11 +17,11 @@ class CheckpointsWithBest(Checkpoints):
         current_folder = self._get_checkpoint_folder(iteration)
         current_folder.mkdir(parents=True)
         self._save_to(current_folder)
-        if metrics['sdice_score'] > self.best_so_far:
+        if metrics[self.metric_to_use] > self.best_so_far:
             best_folder = self._get_best_checkpoint_folder()
             best_folder.mkdir(parents=True,exist_ok=True)
             self._save_to(best_folder)
-            self.best_so_far = metrics['sdice_score']
+            self.best_so_far = metrics[self.metric_to_use]
         if iteration:
             self._clear_checkpoint(iteration - 1)
 
