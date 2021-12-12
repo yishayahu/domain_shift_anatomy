@@ -1,5 +1,5 @@
 FREEZE_FUNC: "none_func"
-NUM_EPOCHS: 60
+NUM_EPOCHS: 40
 MSM: True
 OPTIMIZER:
   FUNC: Adam
