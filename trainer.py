@@ -20,7 +20,7 @@ from dpipe.torch import save_model_state, load_model_state, inference_step
 from clustering.dataloader_wrapper import DataLoaderWrapper
 from clustering.ds_wrapper import DsWrapper
 from spottunet.dataset.multiSiteMri import MultiSiteMri, MultiSiteDl, InfiniteLoader
-from spottunet.msm_utils import compute_metrics_msm, compute_metrics_for_test
+from spottunet.msm_utils import  ComputeMetricsMsm
 from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
 
     print(f'running {opts.exp_name}')
-
+    fix_seed(75)
     if not msm:
         voxel_spacing = (1, 0.95, 0.95)
 
@@ -229,6 +229,7 @@ if __name__ == '__main__':
 
     if msm:
         metric_to_use = 'dice'
+        msm_metrics_computer = ComputeMetricsMsm(val_ids=val_ids,test_ids=test_ids,logger=logger)
     else:
         metric_to_use = 'sdice_score'
 
@@ -252,7 +253,8 @@ if __name__ == '__main__':
             def predict(image):
                 return inference_step_spottune(image, architecture_main=architecture, architecture_policy=architecture_policy,
                                                activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference,soft=cfg.SOFT)
-            validate_step = partial(compute_metrics_msm,ids=val_ids,predict=predict)
+            msm_metrics_computer.predict = predict
+            validate_step = partial(msm_metrics_computer.val_metrices)
         lr_init_policy = 0.01
         lr_policy = Schedule(initial=lr_init_policy, epoch2value_multiplier={45: 0.1, })
         optimizer_policy = torch.optim.Adam(
@@ -285,7 +287,8 @@ if __name__ == '__main__':
         else:
             def predict(image):
                 return inference_step(image, architecture=architecture, activation=torch.sigmoid)
-            validate_step = partial(compute_metrics_msm,ids=val_ids,predict=predict)
+            msm_metrics_computer.predict = predict
+            validate_step = partial(msm_metrics_computer.val_metrices)
 
         lr_policy = None
         architecture_policy = None
@@ -351,7 +354,7 @@ if __name__ == '__main__':
     )
     predict_to_dir = skip_predict
     if msm:
-        evaluate_individual_metrics = partial(compute_metrics_for_test,ids=test_ids,predict=predict,logger=logger)
+        evaluate_individual_metrics = partial(msm_metrics_computer.test_metrices)
     else:
         final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
         evaluate_individual_metrics = partial(

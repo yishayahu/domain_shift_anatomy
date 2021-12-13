@@ -44,7 +44,14 @@ class MultiSiteMri(torch.utils.data.Dataset):
         num_patches_now = 0
         limX, limY, limZ = np.where(mask > 0)
 
-        z = range(max(1, np.min(limZ)),min(np.max(limZ), mask.shape[2] - 2))
+        z = []
+        for i in range(1, mask.shape[2] - 2):
+            min1 = np.min(limZ)
+            max1 = np.max(limZ)
+            if min1 <= i < max1:
+                z.append(i)
+            elif np.random.random()< 0.1:
+                z.append(i)
         num_patches = len(z)
 
 

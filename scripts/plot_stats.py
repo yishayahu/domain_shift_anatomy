@@ -1,6 +1,7 @@
 import itertools
 import json
 
+import numpy as np
 from matplotlib import pyplot as plt
 
 def plot_stats(stats):
