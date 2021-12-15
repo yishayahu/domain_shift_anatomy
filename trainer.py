@@ -331,7 +331,7 @@ if __name__ == '__main__':
         batch_iter = Infinite(
             sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
                         weights=ids_sampling_weights, random_state=seed),
-            unpack_args(get_random_slice, interval=slice_sampling_interval),
+            unpack_args(get_random_slice, interval=slice_sampling_interval,msm=True),
             multiply(np.float32),
             batch_size=batch_size, batches_per_epoch=batches_per_epoch
         )

@@ -13,9 +13,13 @@ from dpipe.batch_iter import unpack_args
 SPATIAL_DIMS = (-3, -2, -1)
 
 
-def get_random_slice(*arrays, interval: int = 1):
-    slc = np.random.randint(arrays[0].shape[0] // interval) * interval
-    return tuple(array[slc] for array in arrays)
+def get_random_slice(*arrays, interval: int = 1,msm=False):
+    if msm:
+        slc = np.random.randint(arrays[0].shape[0] // interval) * interval
+        return tuple(array[slc] for array in arrays)
+    else:
+        slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
+        return tuple(array[..., slc] for array in arrays)
 
 
 def sample_center_uniformly(shape, patch_size, spatial_dims):
