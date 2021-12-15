@@ -16,7 +16,7 @@ BASELINE_PATH = choose_root(
 msm_splits_dir = choose_root('/home/dsi/shaya/data_split_msm/')
 msm_res_dir = choose_root('/home/dsi/shaya/msm_results/')
 
-st_res_dir = choose_root('/home/dsi/shaya/spottune_results/')
+st_res_dir = choose_root('/home/dsi/shaya/spottune_results2/')
 st_splits_dir = choose_root('/home/dsi/shaya/data_splits/')
 
 

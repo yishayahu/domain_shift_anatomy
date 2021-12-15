@@ -14,8 +14,8 @@ SPATIAL_DIMS = (-3, -2, -1)
 
 
 def get_random_slice(*arrays, interval: int = 1):
-    slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
-    return tuple(array[..., slc] for array in arrays)
+    slc = np.random.randint(arrays[0].shape[0] // interval) * interval
+    return tuple(array[slc] for array in arrays)
 
 
 def sample_center_uniformly(shape, patch_size, spatial_dims):

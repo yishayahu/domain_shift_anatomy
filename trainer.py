@@ -224,6 +224,8 @@ if __name__ == '__main__':
     cfg.second_round()
 
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
+    if 'load_by_gradual_id' in str(type(sample_func)):
+        sample_func = partial(sample_func,ts_size=opts.ts_size)
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
@@ -326,11 +328,13 @@ if __name__ == '__main__':
             num_workers=0, pin_memory=True, sampler=train_dataset.current_sampler)
         train_kwargs['batch_iter_step'] = batch_iter
     elif msm:
-
-        batch_iter = InfiniteLoader(MultiSiteDl(dataset, batch_size=batch_size, shuffle=True, num_workers=0,
-                                                pin_memory=True),batches_per_epoch=batches_per_epoch)
-
-
+        batch_iter = Infinite(
+            sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
+                        weights=ids_sampling_weights, random_state=seed),
+            unpack_args(get_random_slice, interval=slice_sampling_interval),
+            multiply(np.float32),
+            batch_size=batch_size, batches_per_epoch=batches_per_epoch
+        )
     else:
         batch_iter = Infinite(
             sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,

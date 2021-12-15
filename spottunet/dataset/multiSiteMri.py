@@ -16,23 +16,24 @@ class MultiSiteMri(torch.utils.data.Dataset):
     def __init__(self, ids):
         self.patches_Allimages, self.patches_Allmasks = self.create_datalists(ids)
 
+    def load_image(self,id1):
+        return self.patches_Allimages[id1[0]]
+    def load_segm(self,id1):
+        return self.patches_Allmasks[id1[0]]
     def __getitem__(self, idx):
-        idx1 = np.random.randint(len(self.patches_Allimages))
-        return self.patches_Allimages[idx1],self.patches_Allmasks[idx1]
+        raise NotImplementedError()
 
     def __len__(self):
         return len(self.patches_Allimages)
 
 
     def create_datalists(self,ids):
-        patches_Allimages=np.array([])
-        patches_Allmasks = np.array([])
+        patches_Allimages= {}
+        patches_Allmasks = {}
         for id1 in ids:
             patches = self.extract_patch(id1)
-            patches_Allimages=np.concatenate((patches_Allimages,patches[0])) if patches_Allimages.size else patches[0]
-            patches_Allmasks = np.concatenate((patches_Allmasks, patches[1])) if patches_Allmasks.size else patches[1]
-        self.patches_Allimages=patches_Allimages
-        self.patches_Allmasks = patches_Allmasks
+            patches_Allimages[id1[0]] = patches[0]
+            patches_Allmasks[id1[0]] = patches[1]
         return patches_Allimages, patches_Allmasks
 
 
@@ -45,9 +46,9 @@ class MultiSiteMri(torch.utils.data.Dataset):
         limX, limY, limZ = np.where(mask > 0)
 
         z = []
+        min1 = np.min(limZ)
+        max1 = np.max(limZ)
         for i in range(1, mask.shape[2] - 2):
-            min1 = np.min(limZ)
-            max1 = np.max(limZ)
             if min1 <= i < max1:
                 z.append(i)
             elif np.random.random()< 0.1:
