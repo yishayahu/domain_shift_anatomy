@@ -57,12 +57,12 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
 
 
     my_devices.remove(device)
-def run_cross_validation(experiments, combs,data_split_path,res_path,metric, only_stats=False):
+def run_cross_validation(experiments, combs,data_split_path,res_path,metric,target_sizes, only_stats=False):
     if torch.cuda.is_available():
         nvmlInit()
     manager = multiprocessing.Manager()
 
-    target_sizes = [2,1,4]
+
     stats = {}
 
     running_now = []
@@ -151,7 +151,7 @@ def main():
         combs = [(0,0)]
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
-        run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path)
+        run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[2,4,6])
     if opts.st:
         base_exps_sgd = ['posttrain','spottune','posttrain_continue_optimizer','gradual_tl']
         base_exps_adam = ['posttrain_adam', 'spottune_adam', 'gradual_tl_adam','posttrain_continue_optimizer_from_step_adam','gradual_tl__continue_optimzer_adam_from_step']
@@ -163,7 +163,7 @@ def main():
         combs = itertools.permutations(range(6),2)
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
-        run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path)
+        run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[2,1,4])
 
 if __name__ == '__main__':
     main()
