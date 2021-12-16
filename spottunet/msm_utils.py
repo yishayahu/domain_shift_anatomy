@@ -158,14 +158,16 @@ class ComputeMetricsMsm:
 
     def test_metrices(self,results_path,best=''):
         os.makedirs(results_path, exist_ok=False)
+        if not self.mask_labeled_amount:
+            self.val_metrices()
         results = self.compute('test',filter_sparse_tagging=True)
         results.pop('remove_label_th')
         for metric_name, result in results.items():
             save_json(result, os.path.join(results_path, metric_name + '.json'), indent=0)
             if self.logger is not None:
                 self.logger.value(f'test_{metric_name}{best}',result)
-        results.pop('remove_label_th')
         results = self.compute('test',filter_sparse_tagging=False)
+        results.pop('remove_label_th')
         for metric_name, result in results.items():
             save_json(result, os.path.join(results_path, metric_name + '.json'), indent=0)
             if self.logger is not None:
