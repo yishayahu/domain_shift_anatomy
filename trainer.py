@@ -94,7 +94,7 @@ if __name__ == '__main__':
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
     if msm:
-        assert opts.source == opts.target
+        assert opts.source == opts.target or opts.train_only_source
         base_res_dir = msm_res_dir
         base_split_dir = msm_splits_dir
     else:
