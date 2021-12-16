@@ -45,7 +45,10 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
             cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd,shell=True,check=True)
-            sdice = np.mean(list(json.load(open(sdice_path)).values()))
+            sdice = json.load(open(sdice_path))
+            if type(sdice)!= float:
+                sdice = np.mean(list(sdice).values())
+
             ret_value.value = sdice
         except subprocess.CalledProcessError:
             print(f'error in exp {exp}_{source}_{target}_{ts}')
@@ -73,6 +76,8 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric, onl
                     stats[exp][ts] = {}
                 source, target = combination
                 if source == 0 and target == 2:
+                    continue
+                if target == 0:
                     continue
                 adam_or_sgd = 'adam' if 'adam' in exp else 'sgd'
                 msm = '_msm' if 'msm' in exp else ''
