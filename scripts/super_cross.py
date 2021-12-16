@@ -77,10 +77,11 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric, onl
                 source, target = combination
                 if source == 0 and target == 2:
                     continue
-                if target == 0:
-                    continue
+
                 adam_or_sgd = 'adam' if 'adam' in exp else 'sgd'
                 msm = '_msm' if 'msm' in exp else ''
+                if target == 0 and 'msm' not in exp:
+                    continue
                 last_ckpt = '59' if 'msm' in exp else '59'
                 src_ckpt_path = f'{data_split_path}/sources/source_{source}/model_{adam_or_sgd}.pth'
 
