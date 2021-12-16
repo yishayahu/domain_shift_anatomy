@@ -13,7 +13,7 @@ BASELINE_PATH = choose_root(
     '/home/dsi/shaya/domain_shift_anatomy/exp',
 )
 
-msm_splits_dir = choose_root('/home/dsi/shaya/data_split_msm/')
+msm_splits_dir = choose_root('/home/dsi/shaya/data_split_msm2/')
 msm_res_dir = choose_root('/home/dsi/shaya/msm_results/')
 
 st_res_dir = choose_root('/home/dsi/shaya/spottune_results/')
