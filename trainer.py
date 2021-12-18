@@ -148,7 +148,7 @@ if __name__ == '__main__':
         base_ckpt_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','model_adam.pth')
         optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_adam.pth')
     batch_size = 16
-    lr_init = 1e-3
+    lr_init = getattr(cfg,'LR_INIT',1e-3)
     if opts.train_only_source:
         project = f'spot_s{opts.source}'
     else:

@@ -1,0 +1,9 @@
+NUM_EPOCHS: 60
+SPOT: True
+SOFT: False
+MSM: True
+FREEZE_FUNC: "freeze_model_spottune"
+OPTIMIZER:
+  FUNC: Adam
+LR_INIT: 0.0001
+
