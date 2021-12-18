@@ -148,7 +148,7 @@ def main():
     opts = cli.parse_args()
     if opts.msm:
         experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','gradual_tl__continue_optimzer_msm_adam_from_step','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam']
-        combs = [(0,0)]
+        combs = [(2,2)]
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
         run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[2,4])
