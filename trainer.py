@@ -237,7 +237,7 @@ if __name__ == '__main__':
         metric_to_use = 'sdice_score'
 
     if spot:
-        architecture_policy = resnet(num_class=64)
+        architecture_policy = resnet(num_class=64,in_chans=n_chans_in)
         architecture_policy.to(device)
         temperature = 0.1
         use_gumbel_inference = False
