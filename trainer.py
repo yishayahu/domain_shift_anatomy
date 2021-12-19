@@ -93,6 +93,10 @@ if __name__ == '__main__':
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
+    slice_sampling_interval = 1
+    if opts.ts_size == 0:
+        opts.ts_size = 1
+        slice_sampling_interval = 4
     if msm:
         assert opts.source == opts.target or opts.train_only_source
         base_res_dir = msm_res_dir
@@ -311,7 +315,7 @@ if __name__ == '__main__':
 
 
     ids_sampling_weights = None
-    slice_sampling_interval = 1  # 1, 3, 6, 12, 24, 36, 48 todo: change to be configable
+
 
 
 

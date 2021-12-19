@@ -2,3 +2,4 @@ FREEZE_FUNC:
   FUNC: "freeze_model"
   exclude_layers: [ 'init_path.0', 'init_path.1' ]
 NUM_EPOCHS: 60
+
