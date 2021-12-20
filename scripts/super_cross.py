@@ -3,6 +3,7 @@ import itertools
 import json
 import multiprocessing
 import os
+import random
 import shutil
 import subprocess
 import tempfile
@@ -150,7 +151,7 @@ def main():
     cli.add_argument("--st", action='store_true')
     opts = cli.parse_args()
     if opts.msm:
-        experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','gradual_tl__continue_optimzer_msm_adam_from_step','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam']
+        experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','gradual_tl__continue_optimzer_msm_adam_from_step','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam','unfreeze_first_msm_adam']
         combs = [(0,0),(1,1),(2,2),(3,3),(4,4),(5,5)]
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
@@ -160,7 +161,8 @@ def main():
         base_exps_adam = ['posttrain_adam', 'spottune_adam', 'gradual_tl_adam','posttrain_continue_optimizer_from_step_adam','gradual_tl__continue_optimzer_adam_from_step','unfreeze_first_adam']
         experiments_base = base_exps_sgd+base_exps_adam
         experiments =  experiments_base
-        combs = itertools.permutations(range(6),2)
+        combs = list(itertools.permutations(range(6),2))
+        random.shuffle(combs)
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
         run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[0,1,2,4])

@@ -1,0 +1,11 @@
+FREEZE_FUNC:
+  FUNC: "freeze_model"
+  exclude_layers: [ 'init_path.0', 'init_path.1' ]
+NUM_EPOCHS: 60
+MSM: True
+OPTIMIZER:
+  FUNC: Adam
+LR_INIT: 0.0001
+
+
+
