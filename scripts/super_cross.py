@@ -50,7 +50,7 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
             subprocess.run(cmd,shell=True,check=True)
             sdice = json.load(open(sdice_path))
             if type(sdice)!= float:
-                sdice = np.mean(list(sdice).values())
+                sdice = np.mean(list(sdice.values()))
 
             ret_value.value = sdice
         except subprocess.CalledProcessError:
