@@ -20,7 +20,7 @@ from wandb.vendor.pynvml.pynvml import nvmlDeviceGetCount, nvmlDeviceGetHandleBy
 
 def find_available_device(my_devices,running_now):
     if torch.cuda.is_available():
-        wanted_free_mem = 8 * 2 ** 30  # at least 16 GB avail
+        wanted_free_mem = 20 * 2 ** 30  # at least 16 GB avail
         while True:
             for device_num in range(nvmlDeviceGetCount()):
                 if f'cuda:{device_num}' in my_devices:
