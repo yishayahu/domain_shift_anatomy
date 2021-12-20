@@ -18,9 +18,12 @@ from wandb.vendor.pynvml.pynvml import nvmlDeviceGetCount, nvmlDeviceGetHandleBy
     nvmlDeviceGetUtilizationRates, nvmlInit
 
 
-def find_available_device(my_devices,running_now):
+def find_available_device(my_devices,running_now,spottune_and_msm):
     if torch.cuda.is_available():
-        wanted_free_mem = 20 * 2 ** 30  # at least 16 GB avail
+        if spottune_and_msm:
+            wanted_free_mem = 24 * 2 ** 30  # at least 24 GB avail
+        else:
+            wanted_free_mem = 16 * 2 ** 30  # at least 16 GB avail
         while True:
             for device_num in range(nvmlDeviceGetCount()):
                 if f'cuda:{device_num}' in my_devices:
@@ -88,7 +91,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric,targ
                 if not os.path.exists(src_ckpt_path):
                     if only_stats:
                         continue
-                    curr_device = find_available_device(my_devices,running_now)
+                    curr_device = find_available_device(my_devices,running_now,False)
                     print(f'training on source {source} to create {src_ckpt_path}')
                     pp_model = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_{last_ckpt}/model.pth'
                     if not os.path.exists(pp_model):
@@ -102,7 +105,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric,targ
                 if not os.path.exists(sdice_path):
                     if only_stats:
                         continue
-                    curr_device = find_available_device(my_devices,running_now)
+                    curr_device = find_available_device(my_devices,running_now,'msm' in exp and 'spottune' in exp)
                     exp_dir_path = f'{res_path}/ts_size_{ts}/source_{source}_target_{target}/{exp}'
                     if os.path.exists(os.path.join(exp_dir_path,'.lock')):
                         print(f'source {source} target {target} exp {exp} is locked' )
