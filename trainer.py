@@ -89,14 +89,12 @@ if __name__ == '__main__':
     cli.add_argument("--base_split_dir", default='/home/dsi/shaya/data_splits/')
     cli.add_argument("--ts_size", default=2,type=int)
     cli.add_argument("--train_only_source", action='store_true')
+    cli.add_argument("--batch_size", default=16,type=int)
     opts = cli.parse_args()
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
-    slice_sampling_interval = 1
-    if opts.ts_size == 0:
-        opts.ts_size = 1
-        slice_sampling_interval = 4
+    slice_sampling_interval = 1 if opts.ts_size > 0 else 4
     if msm:
         assert opts.source == opts.target or opts.train_only_source
         base_res_dir = msm_res_dir
@@ -151,7 +149,7 @@ if __name__ == '__main__':
         assert optimizer_creator.func == Adam
         base_ckpt_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','model_adam.pth')
         optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_adam.pth')
-    batch_size = 16
+    batch_size = opts.batch_size
     lr_init = getattr(cfg,'LR_INIT',1e-3)
     if opts.train_only_source:
         project = f'spot_s{opts.source}'
@@ -230,7 +228,7 @@ if __name__ == '__main__':
 
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     if 'load_by_gradual_id' in str(type(sample_func)):
-        sample_func = partial(sample_func,ts_size=opts.ts_size)
+        sample_func = partial(sample_func,ts_size=opts.ts_size if opts.ts_size != 0 else 1)
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
