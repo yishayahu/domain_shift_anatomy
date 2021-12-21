@@ -26,7 +26,7 @@ def find_available_device(my_devices,running_now,spottune_and_msm):
         else:
             wanted_free_mem = 6 * 2 ** 30  # at least 16 GB avail
         while True:
-            for device_num in range(nvmlDeviceGetCount()):
+            for device_num in range(5): #todo: change back to device count
                 if f'cuda:{device_num}' in my_devices:
                     continue
                 h = nvmlDeviceGetHandleByIndex(device_num)
