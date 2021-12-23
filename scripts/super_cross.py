@@ -149,6 +149,7 @@ def main():
     cli = argparse.ArgumentParser()
     cli.add_argument("--msm", action='store_true')
     cli.add_argument("--st", action='store_true')
+    cli.add_argument("--dsi", action='store_true')
     opts = cli.parse_args()
     if opts.msm:
         experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','gradual_tl__continue_optimzer_msm_adam_from_step','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam','unfreeze_first_msm_adam']
@@ -161,6 +162,8 @@ def main():
         base_exps_adam = ['posttrain_adam', 'spottune_adam', 'gradual_tl_adam','posttrain_continue_optimizer_from_step_adam','gradual_tl__continue_optimzer_adam_from_step','unfreeze_first_adam']
         experiments_base = base_exps_sgd+base_exps_adam
         experiments =  experiments_base
+        if opts.dsi:
+            experiments = [x for x in experiments if 'spottune' not in x]
         combs = list(itertools.permutations(range(6),2))
         random.shuffle(combs)
         metric = 'sdice_score'
