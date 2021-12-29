@@ -165,6 +165,7 @@ def main():
         if opts.dsi:
             experiments = [x for x in experiments if 'spottune' not in x]
         combs = list(itertools.permutations(range(6),2))
+        combs.remove((5,3))
         random.shuffle(combs)
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
