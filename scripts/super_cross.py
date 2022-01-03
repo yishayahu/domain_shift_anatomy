@@ -156,7 +156,7 @@ def main():
         combs = [(0,0),(1,1),(2,2),(3,3),(4,4),(5,5)]
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
-        run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[2,4])
+        run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
     if opts.st:
         base_exps_sgd = ['posttrain','spottune','posttrain_continue_optimizer','gradual_tl','unfreeze_first']
         base_exps_adam = ['posttrain_adam', 'spottune_adam', 'gradual_tl_adam','posttrain_continue_optimizer_from_step_adam','gradual_tl__continue_optimzer_adam_from_step','unfreeze_first_adam']
