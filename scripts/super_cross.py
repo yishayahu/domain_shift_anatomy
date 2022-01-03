@@ -152,7 +152,7 @@ def main():
     cli.add_argument("--dsi", action='store_true')
     opts = cli.parse_args()
     if opts.msm:
-        experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','gradual_tl__continue_optimzer_msm_adam_from_step','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam','unfreeze_first_msm_adam']
+        experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam','unfreeze_first_msm_adam']
         combs = [(0,0),(1,1),(2,2),(3,3),(4,4),(5,5)]
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
