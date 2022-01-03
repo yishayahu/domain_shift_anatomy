@@ -154,6 +154,7 @@ def main():
     if opts.msm:
         experiments = ['posttrain_msm_adam','gradual_tl_msm_adam','posttrain_continue_optimizer_from_step_msm_adam','spottune_msm_adam','unfreeze_first_msm_adam']
         combs = [(0,0),(1,1),(2,2),(3,3),(4,4),(5,5)]
+        random.shuffle(combs)
         metric = 'dice'
         data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
         run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
