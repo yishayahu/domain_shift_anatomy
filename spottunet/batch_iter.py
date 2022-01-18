@@ -15,12 +15,14 @@ SPATIAL_DIMS = (-3, -2, -1)
 
 def get_random_slice(*arrays, interval: int = 1,msm=False):
     if msm:
-        slc = np.random.randint(arrays[0].shape[0] // interval) * interval
-        return tuple(array[slc] for array in arrays)
+        raise NotImplemented()
+    slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
+    if len(arrays) > 2:
+        domain,id1 = arrays[2:]
+        arrays = arrays[:2]
+        return tuple([array[..., slc] for array in arrays] + [domain,id1,slc])
     else:
-        slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
         return tuple(array[..., slc] for array in arrays)
-
 
 def sample_center_uniformly(shape, patch_size, spatial_dims):
     spatial_shape = np.array(shape)[list(spatial_dims)]

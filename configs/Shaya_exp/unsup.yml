@@ -1,0 +1,18 @@
+NUM_EPOCHS: 20
+BATCHES_PER_EPOCH: 250
+ADD_SOURCE_IDS: True
+FREEZE_FUNC:
+  FUNC: "freeze_model"
+  exclude_layers: [ 'init_path', 'down','bottleneck' ]
+UNSUP: True
+LR_INIT: 0.00001
+
+TRAIN_FUNC:
+  FUNC: train_unsup
+TRAIN_STEP_FUNC:
+  FUNC: train_step_unsup
+  target_domain: target
+SECOND_ROUND:
+  CRITERION:
+    FUNC: weighted_cross_entropy_with_logits
+    reduce:

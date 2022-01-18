@@ -40,6 +40,9 @@ class CC359(SegmentationFromCSV):
 
     def load_domain_label_number(self, i):
         return self.df['fold'].loc[i]
+    @staticmethod
+    def load_id(i):
+        return int(i[2:])
 
     def load_domain_label_number_binary_setup(self, i, domains):
         """Assigns '1' to the domain of the largest index; '0' to another one

@@ -1,7 +1,10 @@
 import argparse
 import os
+import random
 import shutil
 from pathlib import Path
+
+from spottunet import paths
 from torch.optim import *
 import dpipe.commands as commands
 import numpy as np
@@ -29,7 +32,8 @@ from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist, \
     PreDefinedFineTunePolicy
 from spottunet.torch.losses import FineRegularizedLoss
-from spottunet.torch.model import train_step, inference_step_spottune, train_step_spottune
+from spottunet.torch.model import train_step, inference_step_spottune, train_step_spottune, train_step_unsup, \
+    train_unsup
 from spottunet.utils import fix_seed, get_pred, sdice, skip_predict
 from spottunet.metric import evaluate_individual_metrics_probably_with_ids, compute_metrics_probably_with_ids, \
     aggregate_metric_probably_with_ids, evaluate_individual_metrics_probably_with_ids_no_pred, \
@@ -73,11 +77,11 @@ class Config:
     def second_round(self):
         self.parse(self._second_round)
 
-def get_random_patch_2d(image_slc, segm_slc, x_patch_size, y_patch_size):
+def get_random_patch_2d(image_slc, segm_slc,domain,patient_id,slice_num, x_patch_size, y_patch_size):
     sp_dims_2d = (-2, -1)
     center = sample_center_uniformly(segm_slc.shape, y_patch_size, sp_dims_2d)
     x, y = extract_patch((image_slc, segm_slc, center), x_patch_size, y_patch_size, spatial_dims=sp_dims_2d)
-    return x, y
+    return x, y,domain,patient_id,slice_num
 if __name__ == '__main__':
     cli = argparse.ArgumentParser()
     cli.add_argument("--exp_name", default='debug')
@@ -85,33 +89,31 @@ if __name__ == '__main__':
     cli.add_argument("--device", default='cpu')
     cli.add_argument("--source", default=0,type=int)
     cli.add_argument("--target", default=2,type=int)
-    cli.add_argument("--base_res_dir", default='/home/dsi/shaya/spottune_results/')
-    cli.add_argument("--base_split_dir", default='/home/dsi/shaya/data_splits/')
-    cli.add_argument("--ts_size", default=2,type=int)
+    cli.add_argument("--base_res_dir", default=paths.st_res_dir)
+    cli.add_argument("--base_split_dir", default=paths.st_splits_dir)
     cli.add_argument("--train_only_source", action='store_true')
     cli.add_argument("--batch_size", default=16,type=int)
+    if os.path.exists('/home/dsi/shaya/unsup_results/source_0_target_2/debug/'):
+        shutil.rmtree('/home/dsi/shaya/unsup_results/source_0_target_2/debug/')
     opts = cli.parse_args()
+    target = opts.target
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
+
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
-    slice_sampling_interval = 1 if opts.ts_size > 0 else 4
-    if msm:
-        assert opts.source == opts.target or opts.train_only_source
-        base_res_dir = msm_res_dir
-        base_split_dir = msm_splits_dir
-    else:
-        base_res_dir = st_res_dir
-        base_split_dir = st_splits_dir
+    slice_sampling_interval = 20
+
+    base_res_dir = st_res_dir
+    base_split_dir = st_splits_dir
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
     if opts.train_only_source:
         exp_dir = os.path.join(base_res_dir,f'source_{opts.source}',opts.exp_name)
-        splits_dir =  os.path.join(base_split_dir,'sources',f'source_{opts.source}')
+        splits_dir =  os.path.join(base_split_dir,f'site_{opts.source}')
         opts.target = None
-        opts.ts_size = None
     else:
-        exp_dir = os.path.join(base_res_dir,f'ts_size_{opts.ts_size}',f'source_{opts.source}_target_{opts.target}',opts.exp_name)
-        splits_dir =  os.path.join(base_split_dir,f'ts_{opts.ts_size}',f'target_{opts.target}')
+        exp_dir = os.path.join(base_res_dir,f'source_{opts.source}_target_{opts.target}',opts.exp_name)
+        splits_dir =  os.path.join(base_split_dir,f'site_{opts.target}')
     Path(exp_dir).mkdir(parents=True,exist_ok=True)
     log_path = os.path.join(exp_dir,'train_logs')
     saved_model_path = os.path.join(exp_dir,'model.pth')
@@ -125,7 +127,7 @@ if __name__ == '__main__':
 
     train_ids = load(os.path.join(splits_dir,'train_ids.json'))
     if getattr(cfg,'ADD_SOURCE_IDS',False):
-        train_ids = load(os.path.join(base_split_dir,'sources',f'source_{opts.source}','train_ids.json')) + train_ids
+        train_ids = load(os.path.join(base_split_dir,f'site_{opts.source}','train_ids.json')) + train_ids
     test_ids = load(os.path.join(splits_dir,'test_ids.json'))
     if getattr(cfg,'TRAIN_ON_TEST',False):
         train_ids = test_ids
@@ -143,7 +145,7 @@ if __name__ == '__main__':
 
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     if optimizer_creator.func == SGD or getattr(cfg,'START_FROM_SGD',False):
-        base_ckpt_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','model_sgd.pth')
+        base_ckpt_path = os.path.join(base_split_dir,f'site_{opts.source}','model_sgd.pth')
         optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
     else:
         assert optimizer_creator.func == Adam
@@ -151,20 +153,17 @@ if __name__ == '__main__':
         optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_adam.pth')
     batch_size = opts.batch_size
     lr_init = getattr(cfg,'LR_INIT',1e-3)
-    if opts.train_only_source:
-        project = f'spot_s{opts.source}'
-    else:
-        project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
-    if msm:
-        project = 'msm'+ project[4:]
+    project = 'unsup'
 
     if opts.exp_name == 'debug':
         print('debug mode')
-        batches_per_epoch = 2
-        batch_size = 2
+        batches_per_epoch = 5
+        batch_size = 10
         project = 'spot3'
+        random.shuffle(train_ids)
         if len(train_ids) > 2:
             train_ids = train_ids[-4:]
+        val_ids = val_ids[:2]
     else:
         lock_dir(exp_dir)
 
@@ -191,7 +190,7 @@ if __name__ == '__main__':
     n_chans_in = 1
     if msm:
         n_chans_in = 3
-    architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
+    architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16,get_bottleneck=getattr(cfg,'UNSUP',False)) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
     if not opts.train_only_source:
@@ -286,8 +285,12 @@ if __name__ == '__main__':
             @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
             @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
             def predict(image):
-                return inference_step(image, architecture=architecture, activation=torch.sigmoid)
-            validate_step = partial(compute_metrics_probably_with_ids if opts.exp_name != 'debug' else empty_dict_func, predict=predict,
+                old_bottleneck = architecture.get_bottleneck
+                architecture.get_bottleneck = False
+                res =  inference_step(image, architecture=architecture, activation=torch.sigmoid)
+                architecture.get_bottleneck = old_bottleneck
+                return res
+            validate_step = partial(compute_metrics_probably_with_ids, predict=predict,
                                     load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
         else:
             def predict(image):
@@ -306,7 +309,7 @@ if __name__ == '__main__':
             **{k: v for k, v in train_kwargs.items() if isinstance(v, Policy)},
             'model.pth': architecture, 'optimizer.pth': optimizer
         },metric_to_use=metric_to_use)
-        train_step_func = train_step
+        train_step_func =  getattr(cfg,'TRAIN_STEP_FUNC',train_step)
 
 
 
@@ -340,7 +343,7 @@ if __name__ == '__main__':
         )
     else:
         batch_iter = Infinite(
-            sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
+            sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
                               weights=ids_sampling_weights, random_state=seed),
             unpack_args(get_random_slice, interval=slice_sampling_interval),
             unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
@@ -348,7 +351,8 @@ if __name__ == '__main__':
             multiply(np.float32),
             batch_size=batch_size, batches_per_epoch=batches_per_epoch
         )
-    train_model = partial(train,
+
+    train_model = partial(getattr(cfg,'TRAIN_FUNC',train),
         train_step=train_step_func,
         batch_iter=batch_iter,
         n_epochs=n_epochs,

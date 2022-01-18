@@ -69,7 +69,7 @@ def freeze_model(model, exclude_layers=('inconv', )):
 def none_func(*args,**kwargs):
     return None
 def empty_dict_func(*args,**kwargs):
-    return {0:None}
+    return {'sdice_score':50}
 def freeze_model_spottune(model):
     for name, param in model.named_parameters():
         if 'freezed' in name:

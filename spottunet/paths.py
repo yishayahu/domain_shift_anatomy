@@ -13,11 +13,11 @@ BASELINE_PATH = choose_root(
     '/home/dsi/shaya/domain_shift_anatomy/exp',
 )
 
-msm_splits_dir = choose_root('/home/dsi/shaya/data_split_msm2/')
-msm_res_dir = choose_root('/home/dsi/shaya/msm_results/')
+# msm_splits_dir = choose_root('/home/dsi/shaya/data_split_msm2/')
+# msm_res_dir = choose_root('/home/dsi/shaya/msm_results/')
 
-st_res_dir = choose_root('/home/dsi/shaya/spottune_results/')
-st_splits_dir = choose_root('/home/dsi/shaya/data_splits/')
+st_res_dir = choose_root('/home/dsi/shaya/unsup_results/')
+st_splits_dir = choose_root('/home/dsi/shaya/unsup_splits/')
 
 
 multiSiteMri_int_to_site = {0:'ISBI',1:"ISBI_1.5",2:'I2CVB',3:"UCL",4:"BIDMC",5:"HK" }
