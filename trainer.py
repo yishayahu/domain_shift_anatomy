@@ -214,9 +214,7 @@ if __name__ == '__main__':
         if from_step > 0:
             for param in optimizer.param_groups[0]['params']:
                 optimizer.state[param]['step'] = from_step
-    lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
-    if type(lr) == partial:
-        lr = lr()
+
 
     if spot or opts.train_only_source:
         reference_architecture = None
@@ -224,7 +222,9 @@ if __name__ == '__main__':
         reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
-
+    lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
+    if type(lr) == partial:
+        lr = lr()
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     if 'load_by_gradual_id' in str(type(sample_func)):
         sample_func = partial(sample_func,ts_size=opts.ts_size if opts.ts_size != 0 else 1)

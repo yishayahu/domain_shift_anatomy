@@ -16,3 +16,8 @@ SECOND_ROUND:
   CRITERION:
     FUNC: weighted_cross_entropy_with_logits
     reduce:
+  SCHDULER:
+    FUNC: Schedule
+    initial: lr_init
+    epoch2value_multiplier: { 5: 0.1, 10: 0.1 }
+
