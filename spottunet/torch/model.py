@@ -211,6 +211,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                                     source_clusters=source_clusters,
                                     target_clusters=target_clusters,
                                     best_matchs=best_matchs,
+                                    best_matchs_indexes=best_matchs_indexes,
                                     vizviz=vizviz)
                     train_losses.append(loss)
                     broadcast_event(Policy.train_step_finished, epoch, idx, train_losses[-1])
@@ -236,7 +237,6 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 print('doing kmean 2')
                 tc = k2.fit_predict(target_points)
                 print('getting best match')
-
                 best_matchs_indexes=get_best_match(k1.cluster_centers_,k2.cluster_centers_)
                 slice_to_cluster = {}
 
@@ -299,7 +299,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             pass
 
 def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None, **optimizer_params):
+               alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None, **optimizer_params):
     architecture.train()
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets,domains,patient_ids,slice_nums = inputs[0:1], inputs[1:2],inputs[2].flatten(),inputs[3].flatten().int(),inputs[4].flatten().int()
@@ -315,16 +315,18 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
                 dist_loss_counter+=1
                 dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
-                if f'target_{slice_to_cluster[f"{pi}_{sn}"]}' not in vizviz:
+                src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
+                if f'target_{src_cluster}' not in vizviz:
                     img = tensor_to_image(img)
-                    im_path =  f'target_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
+                    im_path =  f'target_{src_cluster}_{train_step_logger._experiment.step}.png'
                     img.save(im_path)
-                    log_log[f'{slice_to_cluster[f"{pi}_{sn}"]}/target'] = wandb.Image(im_path)
-                    vizviz.add(f'target_{slice_to_cluster[f"{pi}_{sn}"]}')
+                    log_log[f'{src_cluster}/target'] = wandb.Image(im_path)
+                    vizviz.add(f'target_{src_cluster}')
 
         else:
             slice_to_feature_source[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
+
                 if f'source_{slice_to_cluster[f"{pi}_{sn}"]}' not in vizviz:
                     img = tensor_to_image(img)
                     im_path =  f'source_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
