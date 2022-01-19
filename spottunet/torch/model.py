@@ -319,7 +319,7 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     img = tensor_to_image(img)
                     im_path =  f'target_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
                     img.save(im_path)
-                    log_log[f'target_{slice_to_cluster[f"{pi}_{sn}"]}'] = wandb.Image(im_path)
+                    log_log[f'{slice_to_cluster[f"{pi}_{sn}"]}/target'] = wandb.Image(im_path)
                     vizviz.add(f'target_{slice_to_cluster[f"{pi}_{sn}"]}')
 
         else:
@@ -329,7 +329,7 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     img = tensor_to_image(img)
                     im_path =  f'source_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
                     img.save(im_path)
-                    log_log[f'source_{slice_to_cluster[f"{pi}_{sn}"]}'] = wandb.Image(im_path)
+                    log_log[f'{slice_to_cluster[f"{pi}_{sn}"]}/source'] = wandb.Image(im_path)
                     vizviz.add(f'source_{slice_to_cluster[f"{pi}_{sn}"]}')
             # if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
             #     dist_loss+= torch.mean(torch.abs(feature - source_clusters[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
