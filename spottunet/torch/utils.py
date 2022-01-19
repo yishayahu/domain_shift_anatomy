@@ -3,6 +3,7 @@ from typing import Sequence, Callable, Union
 import os
 from copy import deepcopy
 
+import PIL
 import numpy as np
 import torch
 from dpipe.batch_iter import sample
@@ -101,3 +102,13 @@ def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[floa
             for _ in range(from_source):
                 yield squeeze_first(tuple(pam(loaders, next(source_iter))))
         epoch+=1
+
+
+def tensor_to_image(tensor):
+    tensor = tensor*255
+    tensor = tensor.detach().cpu()
+    tensor = np.array(tensor, dtype=np.uint8)
+    if np.ndim(tensor)>3:
+        assert tensor.shape[0] == 1
+        tensor = tensor[0]
+    return PIL.Image.fromarray(tensor.squeeze())

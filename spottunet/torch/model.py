@@ -19,6 +19,7 @@ from dpipe.torch.model import *
 
 from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.functional import gumbel_softmax
+from spottunet.torch.utils import tensor_to_image
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2',
           'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0',
@@ -197,6 +198,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             while epoch < n_epochs:
                 slice_to_feature_source = {}
                 slice_to_feature_target = {}
+                vizviz = set()
                 broadcast_event(Policy.epoch_started, epoch)
                 train_losses = []
                 for idx, inputs in enumerate(iterator()):
@@ -208,7 +210,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                                     slice_to_cluster=slice_to_cluster,
                                     source_clusters=source_clusters,
                                     target_clusters=target_clusters,
-                                    best_matchs=best_matchs)
+                                    best_matchs=best_matchs,
+                                    vizviz=vizviz)
                     train_losses.append(loss)
                     broadcast_event(Policy.train_step_finished, epoch, idx, train_losses[-1])
 
@@ -226,28 +229,28 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 points = t.fit_transform(points)
                 source_points,target_points = points[:len(slice_to_feature_source)],points[len(slice_to_feature_source):]
                 # source_points,target_points = points[:max(len(slice_to_feature_source),n_clusters)],points[-max(len(slice_to_feature_target),n_clusters):]
-                k1 = KMeans(n_clusters=n_clusters)
+                k1 = KMeans(n_clusters=n_clusters,random_state=42)
                 print('doing kmean 1')
-
                 sc = k1.fit_predict(source_points)
-                k2 = KMeans(n_clusters=n_clusters)
+                k2 = KMeans(n_clusters=n_clusters,random_state=42)
                 print('doing kmean 2')
                 tc = k2.fit_predict(target_points)
                 print('getting best match')
-                if best_matchs is None:
-                    best_matchs_indexes=get_best_match(k1.cluster_centers_,k2.cluster_centers_)
-                    slice_to_cluster = {}
+
+                best_matchs_indexes=get_best_match(k1.cluster_centers_,k2.cluster_centers_)
+                slice_to_cluster = {}
+
                 items = list(slice_to_feature_source.items())
+
                 for i in range(len(slice_to_feature_source)):
                     source_clusters[sc[i]].append(items[i][1])
-                    if best_matchs is None:
-                        slice_to_cluster[items[i][0]] = sc[i]
+                    slice_to_cluster[items[i][0]] = sc[i]
+
 
                 items = list(slice_to_feature_target.items())
                 for i in range(len(slice_to_feature_target)):
                     target_clusters[tc[i]].append(items[i][1])
-                    if best_matchs is None:
-                        slice_to_cluster[items[i][0]] = tc[i]
+                    slice_to_cluster[items[i][0]] = tc[i]
                 for i in range(len(source_clusters)):
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
@@ -296,7 +299,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             pass
 
 def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None,best_matchs, reference_architecture=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None, **optimizer_params):
+               alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None, **optimizer_params):
     architecture.train()
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets,domains,patient_ids,slice_nums = inputs[0:1], inputs[1:2],inputs[2].flatten(),inputs[3].flatten().int(),inputs[4].flatten().int()
@@ -304,16 +307,34 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
     features = features.mean(1)
     loss_dict = {}
     dist_loss = torch.tensor(0.0,device=logits.device)
-    for d,pi,sn,feature in zip(domains,patient_ids,slice_nums,features):
+    log_log = {}
+    dist_loss_counter = 0
+    for d,pi,sn,feature,img in zip(domains,patient_ids,slice_nums,features,inputs[0]):
         if d == target_domain:
             slice_to_feature_target[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
+                dist_loss_counter+=1
                 dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
+                if f'target_{slice_to_cluster[f"{pi}_{sn}"]}' not in vizviz:
+                    img = tensor_to_image(img)
+                    im_path =  f'target_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
+                    img.save(im_path)
+                    log_log[f'target_{slice_to_cluster[f"{pi}_{sn}"]}'] = wandb.Image(im_path)
+                    vizviz.add(f'target_{slice_to_cluster[f"{pi}_{sn}"]}')
+
         else:
             slice_to_feature_source[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
+            if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
+                if f'source_{slice_to_cluster[f"{pi}_{sn}"]}' not in vizviz:
+                    img = tensor_to_image(img)
+                    im_path =  f'source_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
+                    img.save(im_path)
+                    log_log[f'source_{slice_to_cluster[f"{pi}_{sn}"]}'] = wandb.Image(im_path)
+                    vizviz.add(f'source_{slice_to_cluster[f"{pi}_{sn}"]}')
             # if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
             #     dist_loss+= torch.mean(torch.abs(feature - source_clusters[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
-
+    log_log['dist_loss_counter'] = dist_loss_counter
+    wandb.log(log_log, step=train_step_logger._experiment.step)
     loss = criterion(logits, *targets)
     loss[domains == target_domain] = 0
     loss = loss.mean()

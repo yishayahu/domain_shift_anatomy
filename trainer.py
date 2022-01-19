@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     if opts.exp_name == 'debug':
         print('debug mode')
-        batches_per_epoch = 5
+        batches_per_epoch = 15
         batch_size = 10
         project = 'spot3'
         random.shuffle(train_ids)
