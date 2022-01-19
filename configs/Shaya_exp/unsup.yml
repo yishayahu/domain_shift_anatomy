@@ -12,6 +12,7 @@ TRAIN_FUNC:
 TRAIN_STEP_FUNC:
   FUNC: train_step_unsup
   target_domain: target
+  dist_loss_lambda: 0.1
 SECOND_ROUND:
   CRITERION:
     FUNC: weighted_cross_entropy_with_logits

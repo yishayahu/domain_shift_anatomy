@@ -189,10 +189,11 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
     policies = {name: value for name, value in kwargs.items() if isinstance(value, Policy)}
 
     slice_to_cluster = None
-    n_clusters = 12
+    n_clusters = 14
     source_clusters = None
     target_clusters = None
     best_matchs = None
+    best_matchs_indexes = None
     with batch_iter as iterator:
         try:
             while epoch < n_epochs:
@@ -299,7 +300,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             pass
 
 def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None, **optimizer_params):
+               alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None,dist_loss_lambda=1, **optimizer_params):
     architecture.train()
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets,domains,patient_ids,slice_nums = inputs[0:1], inputs[1:2],inputs[2].flatten(),inputs[3].flatten().int(),inputs[4].flatten().int()
@@ -340,7 +341,7 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
     loss = criterion(logits, *targets)
     loss[domains == target_domain] = 0
     loss = loss.mean()
-    loss_dict['dist_loss'] = dist_loss
+    loss_dict['dist_loss'] = dist_loss * dist_loss_lambda
     loss_dict['loss'] = loss
     loss_dict['total_loss_'] = loss+dist_loss
     loss = loss_dict
