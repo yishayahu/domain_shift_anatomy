@@ -1,3 +1,4 @@
+import os
 import random
 from typing import Callable
 
@@ -70,28 +71,6 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
                 param_size_per_layer.append(float(torch.mean(torch.abs(p1))))
                 normalize_dist_per_layer.append(dist_pet_layer[-1] / param_size_per_layer[-1])
                 names.append(n1)
-        if False:
-            for k, v in {'dist': dist_pet_layer, 'param_size': param_size_per_layer,
-                         'relative_dist': normalize_dist_per_layer, 'dist_bn': dist_pet_layer_bn,
-                         'param_size_bn': param_size_per_layer_bn, 'relative_dist_bn': normalize_dist_per_layer_bn}.items():
-                im_path = f'{train_step_logger._experiment.name}_{k}.png'
-                if 'bn' in k:
-                    curr_names = names_bn
-                else:
-                    curr_names = names
-                print(f'max for {k} is in layer {curr_names[np.argmax(v)]} and its values is {np.max(v)}')
-
-                plt.plot(list(range(len(v))), v)
-                plt.savefig(im_path)
-
-                log_log = {f'{k}': wandb.Image(im_path)}
-                if len(optimizer.param_groups) > 1 and k == 'dist':
-                    for i in range(len(optimizer.param_groups)):
-                        print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
-                        log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']
-                wandb.log(log_log, step=train_step_logger._experiment.step)
-                plt.cla()
-                plt.clf()
 
     if loss_key is not None:
         optimizer_step(optimizer, loss[loss_key], **optimizer_params)
@@ -104,33 +83,34 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         loss = to_np(loss)
     return loss
 
-def permutation_recursion(dists):
-    n_clusters = len(dists)
+def permutation_recursion(distss):
+    n_clusters = len(distss)
     def permutation_recursion_aux(l1,acc_dist,min_dist):
         if len(l1) == n_clusters:
             return acc_dist,l1
         min_l = []
-        current_order = list(range(n_clusters))
-        random.shuffle(current_order)
-        for clus in current_order:
-            if len(l1) == 0:
-                print(f"in clus: {clus}")
-            if clus not in l1:
-                curr_target = len(l1)
-                curr_l = l1.copy()+[clus]
-                curr_acc_dist = acc_dist+dists[clus][curr_target]
-                if curr_acc_dist > min_dist:
-                    continue
-                curr_acc_dist,curr_l = permutation_recursion_aux(curr_l,curr_acc_dist,min_dist)
-                if curr_acc_dist > min_dist:
-                    continue
-                if curr_acc_dist < min_dist:
-                    min_l = curr_l
-                    min_dist = curr_acc_dist
+        curr_target = len(l1)
+        curr_row = distss[:,curr_target].copy()
+        for jjj in range(n_clusters):
+            clus = np.argmin(curr_row)
+            if clus in l1:
+                curr_row[clus] = np.inf
+                continue
+
+            curr_l = l1.copy()+[clus]
+            curr_acc_dist = acc_dist+curr_row[clus]
+            curr_row[clus] = np.inf
+            if curr_acc_dist > min_dist:
+                continue
+            curr_acc_dist,curr_l = permutation_recursion_aux(curr_l,curr_acc_dist,min_dist)
+            if curr_acc_dist > min_dist:
+                continue
+            if curr_acc_dist < min_dist:
+                min_l = curr_l
+                min_dist = curr_acc_dist
 
         return min_dist,min_l
     return permutation_recursion_aux([],0,np.inf)[1]
-
 
 def get_best_match(sc, tc):
     dists = np.full((sc.shape[0],tc.shape[0]),fill_value=np.inf)
@@ -138,13 +118,13 @@ def get_best_match(sc, tc):
         for j in range(tc.shape[0]):
             dists[i][j] = np.mean(np.abs(sc[i]-tc[j]))
     print('looking for best match')
-    best_match = permutation_recursion(dists)
+    best_match = permutation_recursion(dists.copy())
     print('best match found')
 
     return best_match
 
 def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.inf, logger: Logger = None,
-          checkpoints: Checkpoints = None, validate: Callable = None, **kwargs):
+          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14, **kwargs):
     """
     Performs a series of train and validation steps.
 
@@ -187,9 +167,9 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
     epoch = checkpoints.restore()
     scalars = {name: value for name, value in kwargs.items() if not isinstance(value, Policy)}
     policies = {name: value for name, value in kwargs.items() if isinstance(value, Policy)}
-
+    if os.environ['debug']  == 'True':
+        n_clusters = 2
     slice_to_cluster = None
-    n_clusters = 14
     source_clusters = None
     target_clusters = None
     best_matchs = None
@@ -316,11 +296,14 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
     dist_loss = torch.tensor(0.0,device=logits.device)
     log_log = {}
     dist_loss_counter = 0
+    # if best_matchs is not None:
+    #     best_matchs = torch.stack(best_matchs).to(logits.device)
     for d,pi,sn,feature,img in zip(domains,patient_ids,slice_nums,features,inputs[0]):
         if d == target_domain:
             slice_to_feature_target[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
                 dist_loss_counter+=1
+                # dist_loss += torch.min(torch.abs(best_matchs-feature).flatten(1).mean(1))
                 dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
                 src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
                 if f'target_{src_cluster}' not in vizviz or len(vizviz[f'target_{src_cluster}']) < 4:

@@ -162,10 +162,12 @@ if __name__ == '__main__':
         batch_size = 10
         project = 'spot3'
         random.shuffle(train_ids)
+        os.environ['debug']  = 'True'
         if len(train_ids) > 2:
             train_ids = train_ids[-4:]
         val_ids = val_ids[:2]
     else:
+        os.environ['debug']  = 'False'
         lock_dir(exp_dir)
 
 
