@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
-    slice_sampling_interval = 20
+    slice_sampling_interval = 10
 
     base_res_dir = st_res_dir
     base_split_dir = st_splits_dir
@@ -145,7 +145,8 @@ if __name__ == '__main__':
 
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     if optimizer_creator.func == SGD or getattr(cfg,'START_FROM_SGD',False):
-        base_ckpt_path = os.path.join(base_split_dir,f'site_{opts.source}','model_sgd.pth')
+        ckpt_name = getattr(cfg,'CKPT_NAME','model_sgd')
+        base_ckpt_path = os.path.join(base_split_dir,f'site_{opts.source}',f'{ckpt_name}.pth')
         optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
     else:
         assert optimizer_creator.func == Adam

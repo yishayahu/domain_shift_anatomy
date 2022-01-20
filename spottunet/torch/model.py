@@ -199,7 +199,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             while epoch < n_epochs:
                 slice_to_feature_source = {}
                 slice_to_feature_target = {}
-                vizviz = set()
+                vizviz = {}
                 broadcast_event(Policy.epoch_started, epoch)
                 train_losses = []
                 for idx, inputs in enumerate(iterator()):
@@ -240,18 +240,21 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 print('getting best match')
                 best_matchs_indexes=get_best_match(k1.cluster_centers_,k2.cluster_centers_)
                 slice_to_cluster = {}
-
+                source_amounts = [0]*  n_clusters
+                target_amounts = [0]*  n_clusters
                 items = list(slice_to_feature_source.items())
 
                 for i in range(len(slice_to_feature_source)):
                     source_clusters[sc[i]].append(items[i][1])
                     slice_to_cluster[items[i][0]] = sc[i]
+                    source_amounts[sc[i]] += 1
 
 
                 items = list(slice_to_feature_target.items())
                 for i in range(len(slice_to_feature_target)):
                     target_clusters[tc[i]].append(items[i][1])
                     slice_to_cluster[items[i][0]] = tc[i]
+                    target_amounts[tc[i]] += 1
                 for i in range(len(source_clusters)):
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
@@ -275,6 +278,9 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 plt.cla()
                 plt.clf()
                 log_log = {f'fig': wandb.Image(im_path)}
+                for i in range(len(k1.cluster_centers_)):
+                    log_log[f'{i}/source_amount'] = source_amounts[i]
+                    log_log[f'{i}/target_amount'] =  target_amounts[best_matchs_indexes[i]]
                 wandb.log(log_log, step=logger._experiment.step)
                 best_matchs = []
                 for i in range(len(best_matchs_indexes)):
@@ -317,23 +323,27 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                 dist_loss_counter+=1
                 dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
                 src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
-                if f'target_{src_cluster}' not in vizviz:
+                if f'target_{src_cluster}' not in vizviz or len(vizviz[f'target_{src_cluster}']) < 4:
+                    if f'target_{src_cluster}' not in vizviz:
+                        vizviz[f'target_{src_cluster}'] = []
+                    vizviz[f'target_{src_cluster}'].append(None)
                     img = tensor_to_image(img)
-                    im_path =  f'target_{src_cluster}_{train_step_logger._experiment.step}.png'
+                    im_path =  f'target_{src_cluster}_{train_step_logger._experiment.step}_{len(vizviz[f"target_{src_cluster}"])}.png'
                     img.save(im_path)
-                    log_log[f'{src_cluster}/target'] = wandb.Image(im_path)
-                    vizviz.add(f'target_{src_cluster}')
+                    log_log[f'{src_cluster}/target_{len(vizviz[f"target_{src_cluster}"])}'] = wandb.Image(im_path)
 
         else:
             slice_to_feature_source[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
-
-                if f'source_{slice_to_cluster[f"{pi}_{sn}"]}' not in vizviz:
+                src_cluster = slice_to_cluster[f"{pi}_{sn}"]
+                if f'source_{src_cluster}' not in vizviz or len(vizviz[f'source_{src_cluster}']) < 4:
+                    if f'source_{src_cluster}' not in vizviz:
+                        vizviz[f'source_{src_cluster}'] = []
+                    vizviz[f'source_{src_cluster}'].append(None)
                     img = tensor_to_image(img)
-                    im_path =  f'source_{slice_to_cluster[f"{pi}_{sn}"]}_{train_step_logger._experiment.step}.png'
+                    im_path =  f'source_{src_cluster}_{train_step_logger._experiment.step}_{len(vizviz[f"source_{src_cluster}"])}.png'
                     img.save(im_path)
-                    log_log[f'{slice_to_cluster[f"{pi}_{sn}"]}/source'] = wandb.Image(im_path)
-                    vizviz.add(f'source_{slice_to_cluster[f"{pi}_{sn}"]}')
+                    log_log[f'{src_cluster}/source_{len(vizviz[f"source_{src_cluster}"])}'] = wandb.Image(im_path)
             # if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
             #     dist_loss+= torch.mean(torch.abs(feature - source_clusters[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
     log_log['dist_loss_counter'] = dist_loss_counter
