@@ -236,7 +236,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                     slice_to_cluster[items[i][0]] = tc[i]
                     target_amounts[tc[i]] += 1
                 for i in range(len(source_clusters)):
-                    source_clusters[i] = np.mean(source_clusters[i],axis=0)
+                    amount =  len(source_clusters[i])
+                    source_clusters[i] = [np.mean(source_clusters[i],axis=0),amount]
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
 
                 im_path = f'{logger._experiment.name}_{epoch}.png'
@@ -264,7 +265,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 wandb.log(log_log, step=logger._experiment.step)
                 best_matchs = []
                 for i in range(len(best_matchs_indexes)):
-                    best_matchs.append(torch.tensor(source_clusters[best_matchs_indexes[i]]))
+                    best_matchs.append([torch.tensor(source_clusters[best_matchs_indexes[i]][0]),source_clusters[best_matchs_indexes[i]][1]])
                 logger.train(train_losses, epoch)
                 logger.policies(get_policy_values(), epoch)
                 broadcast_event(Policy.validation_started, epoch, train_losses)
@@ -304,7 +305,7 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
                 dist_loss_counter+=1
                 # dist_loss += torch.min(torch.abs(best_matchs-feature).flatten(1).mean(1))
-                dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
+                dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']][0].to(logits.device)))
                 src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
                 if f'target_{src_cluster}' not in vizviz or len(vizviz[f'target_{src_cluster}']) < 4:
                     if f'target_{src_cluster}' not in vizviz:
@@ -319,6 +320,10 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
             slice_to_feature_source[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
                 src_cluster = slice_to_cluster[f"{pi}_{sn}"]
+                tgt_cluster = best_matchs_indexes.index(src_cluster)
+                amount = best_matchs[tgt_cluster][1]
+                best_matchs[tgt_cluster][0] = ((best_matchs[tgt_cluster][0].detach().to(logits.device) * amount) + feature.detach()) / (amount+1)
+                best_matchs[tgt_cluster][1] = amount+1
                 if f'source_{src_cluster}' not in vizviz or len(vizviz[f'source_{src_cluster}']) < 4:
                     if f'source_{src_cluster}' not in vizviz:
                         vizviz[f'source_{src_cluster}'] = []
