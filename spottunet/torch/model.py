@@ -334,7 +334,8 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
     loss = criterion(logits, *targets)
     loss[domains == target_domain] = 0
     loss = loss.mean()
-    loss_dict['dist_loss'] = dist_loss * dist_loss_lambda
+    dist_loss*= dist_loss_lambda
+    loss_dict['dist_loss'] = dist_loss
     loss_dict['loss'] = loss
     loss_dict['total_loss_'] = loss+dist_loss
     loss = loss_dict
