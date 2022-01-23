@@ -1,5 +1,5 @@
 NUM_EPOCHS: 20
-BATCHES_PER_EPOCH: 500
+BATCHES_PER_EPOCH: 1000
 ADD_SOURCE_IDS: True
 FREEZE_FUNC:
   FUNC: "freeze_model"
@@ -8,7 +8,7 @@ UNSUP: True
 LR_INIT: 0.00001
 TRAIN_FUNC:
   FUNC: train_unsup
-  n_clusters: 14
+  n_clusters: 50
 TRAIN_STEP_FUNC:
   FUNC: train_step_unsup
   target_domain: target

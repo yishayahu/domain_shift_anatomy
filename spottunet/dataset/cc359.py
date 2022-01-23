@@ -84,6 +84,7 @@ class Rescale3D(Change):
         return np.nan_to_num(scale_factor, nan=1)
 
     def _change(self, x, i):
+        return x
         return zoom(x, self._scale_factor(i), order=self.order)
 
     def load_spacing(self, i):

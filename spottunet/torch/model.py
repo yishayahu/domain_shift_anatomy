@@ -1,13 +1,16 @@
 import os
+import pickle
 import random
 from typing import Callable
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import wandb
 from dpipe.train import Checkpoints, Logger, Policy, EarlyStopping, ValuePolicy
 from dpipe.train.base import _DummyCheckpoints, _DummyLogger, _build_context_manager
+from scipy.optimize import linear_sum_assignment
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -21,6 +24,7 @@ from dpipe.torch.model import *
 from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.functional import gumbel_softmax
 from spottunet.torch.utils import tensor_to_image
+matplotlib.use('Agg')
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2',
           'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0',
@@ -83,34 +87,15 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
         loss = to_np(loss)
     return loss
 
-def permutation_recursion(distss):
+def get_best_match_aux(distss):
     n_clusters = len(distss)
-    def permutation_recursion_aux(l1,acc_dist,min_dist):
-        if len(l1) == n_clusters:
-            return acc_dist,l1
-        min_l = []
-        curr_target = len(l1)
-        curr_row = distss[:,curr_target].copy()
-        for jjj in range(n_clusters):
-            clus = np.argmin(curr_row)
-            if clus in l1:
-                curr_row[clus] = np.inf
-                continue
+    print('n_clusterss',n_clusters)
+    res = linear_sum_assignment(distss)[1].tolist()
+    targets = [None] *n_clusters
+    for x,y in enumerate(res):
+        targets[y] = x
+    return targets
 
-            curr_l = l1.copy()+[clus]
-            curr_acc_dist = acc_dist+curr_row[clus]
-            curr_row[clus] = np.inf
-            if curr_acc_dist > min_dist:
-                continue
-            curr_acc_dist,curr_l = permutation_recursion_aux(curr_l,curr_acc_dist,min_dist)
-            if curr_acc_dist > min_dist:
-                continue
-            if curr_acc_dist < min_dist:
-                min_l = curr_l
-                min_dist = curr_acc_dist
-
-        return min_dist,min_l
-    return permutation_recursion_aux([],0,np.inf)[1]
 
 def get_best_match(sc, tc):
     dists = np.full((sc.shape[0],tc.shape[0]),fill_value=np.inf)
@@ -118,7 +103,9 @@ def get_best_match(sc, tc):
         for j in range(tc.shape[0]):
             dists[i][j] = np.mean(np.abs(sc[i]-tc[j]))
     print('looking for best match')
-    best_match = permutation_recursion(dists.copy())
+    pickle.dump(dists,open('dists.p','wb'))
+    best_match = get_best_match_aux(dists.copy())
+    pickle.dump(best_match,open('best_match.p','wb'))
     print('best match found')
 
     return best_match
@@ -239,25 +226,26 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
 
-                im_path = f'{logger._experiment.name}_{epoch}.png'
-
-                colors = ['black','blue','cyan','red','orange'
-                        ,'tomato','lime','gold','magenta','dodgerblue'
-                          ,'peru','grey','brown','olive','navy'
-                          ,'blueviolet','darkgreen','maroon','yellow','cadetblue']
-
-
-                fig = plt.figure()
-                ax = fig.add_subplot(projection='3d')
-                for i,(p,marker) in enumerate([(k1.cluster_centers_,'.'),(k2.cluster_centers_,'^')]):
-                    if i ==0:
-                        ax.scatter(p[:,0],p[:,1],p[:,2],marker = marker,c=colors[:len(p)])
-                    else:
-                        ax.scatter(p[:,0],p[:,1],p[:,2],marker = marker,c=[colors[best_matchs_indexes[i]] for i in range(len(p))])
-                plt.savefig(im_path)
-                plt.cla()
-                plt.clf()
-                log_log = {f'fig': wandb.Image(im_path)}
+                # im_path = f'{logger._experiment.name}_{epoch}.png'
+                #
+                # colors = ['black','blue','cyan','red','orange'
+                #         ,'tomato','lime','gold','magenta','dodgerblue'
+                #           ,'peru','grey','brown','olive','navy'
+                #           ,'blueviolet','darkgreen','maroon','yellow','cadetblue']
+                #
+                #
+                # fig = plt.figure()
+                # ax = fig.add_subplot(projection='3d')
+                # for i,(p,marker) in enumerate([(k1.cluster_centers_,'.'),(k2.cluster_centers_,'^')]):
+                #     if i ==0:
+                #         ax.scatter(p[:,0],p[:,1],p[:,2],marker = marker,c=colors[:len(p)])
+                #     else:
+                #         ax.scatter(p[:,0],p[:,1],p[:,2],marker = marker,c=[colors[best_matchs_indexes[i]] for i in range(len(p))])
+                # plt.savefig(im_path)
+                # plt.cla()
+                # plt.clf()
+                # log_log = {f'fig': wandb.Image(im_path)}
+                log_log = {}
                 for i in range(len(k1.cluster_centers_)):
                     log_log[f'{i}/source_amount'] = source_amounts[i]
                     log_log[f'{i}/target_amount'] =  target_amounts[best_matchs_indexes[i]]
