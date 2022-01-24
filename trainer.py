@@ -101,6 +101,8 @@ if __name__ == '__main__':
 
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
+    if msm:
+        assert opts.target ==opts.source or opts.train_only_source
     slice_sampling_interval = 1
 
     base_res_dir = st_res_dir if not msm else msm_res_dir
@@ -110,6 +112,8 @@ if __name__ == '__main__':
     if opts.train_only_source:
         exp_dir = os.path.join(base_res_dir,f'source_{opts.source}',opts.exp_name)
         splits_dir =  os.path.join(base_split_dir,f'site_{opts.source}')
+        if msm:
+            splits_dir+='t'
         opts.target = None
     else:
         exp_dir = os.path.join(base_res_dir,f'source_{opts.source}_target_{opts.target}',opts.exp_name)
@@ -127,7 +131,11 @@ if __name__ == '__main__':
 
     train_ids = load(os.path.join(splits_dir,'train_ids.json'))
     if getattr(cfg,'ADD_SOURCE_IDS',False):
-        train_ids = load(os.path.join(base_split_dir,f'site_{opts.source}','train_ids.json')) + train_ids
+        if msm:
+            train_ids = load(os.path.join(base_split_dir,f'site_{opts.source}t','train_ids.json')) + train_ids
+        else:
+            train_ids = load(os.path.join(base_split_dir,f'site_{opts.source}','train_ids.json')) + train_ids
+
     test_ids = load(os.path.join(splits_dir,'test_ids.json'))
     if getattr(cfg,'TRAIN_ON_TEST',False):
         train_ids = test_ids
@@ -297,7 +305,11 @@ if __name__ == '__main__':
                                     load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
         else:
             def predict(image):
-                return inference_step(image, architecture=architecture, activation=torch.sigmoid)
+                old_bottleneck = architecture.get_bottleneck
+                architecture.get_bottleneck = False
+                res =  inference_step(image, architecture=architecture, activation=torch.sigmoid)
+                architecture.get_bottleneck = old_bottleneck
+                return res
             msm_metrics_computer.predict = predict
             validate_step = partial(msm_metrics_computer.val_metrices)
 

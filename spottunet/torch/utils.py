@@ -111,4 +111,9 @@ def tensor_to_image(tensor):
     if np.ndim(tensor)>3:
         assert tensor.shape[0] == 1
         tensor = tensor[0]
-    return PIL.Image.fromarray(tensor.squeeze())
+    if tensor.shape[0] == 1:
+        tensor = tensor.squeeze()
+    else:
+        assert tensor.shape[0] == 3
+        tensor= tensor.transpose((1,2,0))
+    return PIL.Image.fromarray(tensor)

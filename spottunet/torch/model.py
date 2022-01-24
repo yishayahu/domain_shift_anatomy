@@ -3,7 +3,7 @@ import pickle
 import random
 from typing import Callable
 
-# import matplotlib
+import matplotlib
 # import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -24,7 +24,7 @@ from dpipe.torch.model import *
 from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.functional import gumbel_softmax
 from spottunet.torch.utils import tensor_to_image
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2',
           'down1.3', 'shortcut1', 'down2.0', 'down2.1', 'down2.2', 'down2.3', 'shortcut2', 'bottleneck.0',
