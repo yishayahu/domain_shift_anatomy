@@ -1,0 +1,3 @@
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+MSM: True

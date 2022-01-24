@@ -8,6 +8,9 @@ import torch.backends.cudnn as cudnn
 import SimpleITK as sitk
 from spottunet import paths
 from torch.utils.data import DataLoader
+
+from spottunet.paths import multiSiteMri_site_to_int
+
 cudnn.benchmark = True
 
 
@@ -20,6 +23,15 @@ class MultiSiteMri(torch.utils.data.Dataset):
         return self.patches_Allimages[id1[0]]
     def load_segm(self,id1):
         return self.patches_Allmasks[id1[0]]
+    def load_domain_label_number(self,id1):
+        id1 = id1[0]
+        sup = id1.split('/')[0]
+        return multiSiteMri_site_to_int[sup]
+
+    def load_id(self,id1):
+
+        return int(str(self.load_domain_label_number(id1)) + id1[0][-6:-4])
+
     def __getitem__(self, idx):
         raise NotImplementedError()
 
