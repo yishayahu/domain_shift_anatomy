@@ -21,7 +21,7 @@ from torch.optim import Optimizer
 from dpipe.im.utils import identity, dmap
 from dpipe.torch.utils import *
 from dpipe.torch.model import *
-
+import matplotlib.cm as mplcm
 from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.functional import gumbel_softmax
 from spottunet.torch.utils import tensor_to_image
@@ -227,9 +227,13 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
                 # pictures
+                cm = plt.get_cmap('gist_rainbow')
+                cNorm  = colors.Normalize(vmin=0, vmax=n_clusters-1)
+                scalarMap = mplcm.ScalarMappable(norm=cNorm, cmap=cm)
                 colors = []
                 for i in range(n_clusters):
-                    colors.append((random.random(),random.random(),random.random(),random.random()))
+                    colors.append(scalarMap.to_rgba(i))
+
                 im_path_source = f'{logger._experiment.name}_{epoch}_source.png'
                 fig = plt.figure()
                 ax = fig.add_subplot()
