@@ -10,6 +10,7 @@ import torch
 import wandb
 from dpipe.train import Checkpoints, Logger, Policy, EarlyStopping, ValuePolicy
 from dpipe.train.base import _DummyCheckpoints, _DummyLogger, _build_context_manager
+from matplotlib import pyplot as plt
 from scipy.optimize import linear_sum_assignment
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -190,7 +191,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                     source_clusters.append([])
                     target_clusters.append([])
                 p = PCA(n_components=20,random_state=42)
-                t = TSNE(n_components=3,learning_rate='auto',init='pca',random_state=42)
+                t = TSNE(n_components=2,learning_rate='auto',init='pca',random_state=42)
                 points = np.stack(list(slice_to_feature_source.values()) + list(slice_to_feature_target.values()))
                 points = points.reshape(points.shape[0],-1)
                 print('doing tsne')
@@ -225,27 +226,52 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 for i in range(len(source_clusters)):
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
+                # pictures
+                colors = []
+                for i in range(n_clusters):
+                    colors.append((random.random(),random.random(),random.random(),random.random()))
+                im_path_source = f'{logger._experiment.name}_{epoch}_source.png'
+                fig = plt.figure()
+                ax = fig.add_subplot()
+                curr_colors = []
+                curr_points_x = []
+                curr_points_y = []
+                for i, slc_name in enumerate(slice_to_feature_source.keys()):
+                    curr_points_x.append(points[i][0])
+                    curr_points_y.append(points[i][1])
+                    curr_colors.append(slice_to_cluster[slc_name])
+                ax.scatter(curr_points_x,curr_points_y,marker = '.',c=curr_colors)
+                plt.savefig(im_path_source)
+                plt.cla()
+                plt.clf()
+                im_path_target = f'{logger._experiment.name}_{epoch}_target.png'
+                fig = plt.figure()
+                ax = fig.add_subplot()
+                curr_colors = []
+                curr_points_x = []
+                curr_points_y = []
+                for i, slc_name in enumerate(slice_to_feature_target.keys()):
+                    curr_points_x.append(points[i][0])
+                    curr_points_y.append(points[i][1])
+                    curr_colors.append(best_matchs_indexes[slice_to_cluster[slc_name]])
+                ax.scatter(curr_points_x,curr_points_y,marker = '.',c=curr_colors)
+                plt.savefig(im_path_target)
+                plt.cla()
+                plt.clf()
 
-                # im_path = f'{logger._experiment.name}_{epoch}.png'
-                #
-                # colors = ['black','blue','cyan','red','orange'
-                #         ,'tomato','lime','gold','magenta','dodgerblue'
-                #           ,'peru','grey','brown','olive','navy'
-                #           ,'blueviolet','darkgreen','maroon','yellow','cadetblue']
-                #
-                #
-                # fig = plt.figure()
-                # ax = fig.add_subplot(projection='3d')
-                # for i,(p,marker) in enumerate([(k1.cluster_centers_,'.'),(k2.cluster_centers_,'^')]):
-                #     if i ==0:
-                #         ax.scatter(p[:,0],p[:,1],p[:,2],marker = marker,c=colors[:len(p)])
-                #     else:
-                #         ax.scatter(p[:,0],p[:,1],p[:,2],marker = marker,c=[colors[best_matchs_indexes[i]] for i in range(len(p))])
-                # plt.savefig(im_path)
-                # plt.cla()
-                # plt.clf()
-                # log_log = {f'fig': wandb.Image(im_path)}
-                log_log = {}
+                im_path_clusters = f'{logger._experiment.name}_{epoch}_clusters.png'
+                fig = plt.figure()
+                ax = fig.add_subplot()
+                for i,(p,marker) in enumerate([(k1.cluster_centers_,'.'),(k2.cluster_centers_,'^')]):
+                    if i ==0:
+                        ax.scatter(p[:,0],p[:,1],marker = marker,c=colors[:len(p)])
+                    else:
+                        ax.scatter(p[:,0],p[:,1],marker = marker,c=[colors[best_matchs_indexes[i]] for i in range(len(p))])
+                plt.savefig(im_path_clusters)
+                plt.cla()
+                plt.clf()
+                log_log = {f'fig_source': wandb.Image(im_path_source),f'fig_target': wandb.Image(im_path_target),f'fig_cluster': wandb.Image(im_path_clusters)}
+                # log_log = {}
                 for i in range(len(k1.cluster_centers_)):
                     log_log[f'{i}/source_amount'] = source_amounts[i]
                     log_log[f'{i}/target_amount'] =  target_amounts[best_matchs_indexes[i]]
@@ -284,8 +310,6 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
     dist_loss = torch.tensor(0.0,device=logits.device)
     log_log = {}
     dist_loss_counter = 0
-    # if best_matchs is not None:
-    #     best_matchs = torch.stack(best_matchs).to(logits.device)
     for d,pi,sn,feature,img in zip(domains,patient_ids,slice_nums,features,inputs[0]):
         if d == target_domain:
             slice_to_feature_target[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
