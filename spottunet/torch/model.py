@@ -237,8 +237,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 curr_points_x = []
                 curr_points_y = []
                 for i, slc_name in enumerate(slice_to_feature_source.keys()):
-                    curr_points_x.append(points[i][0])
-                    curr_points_y.append(points[i][1])
+                    curr_points_x.append(source_points[i][0])
+                    curr_points_y.append(source_points[i][1])
                     curr_colors.append(slice_to_cluster[slc_name])
                 ax.scatter(curr_points_x,curr_points_y,marker = '.',c=curr_colors)
                 plt.savefig(im_path_source)
@@ -251,8 +251,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 curr_points_x = []
                 curr_points_y = []
                 for i, slc_name in enumerate(slice_to_feature_target.keys()):
-                    curr_points_x.append(points[i][0])
-                    curr_points_y.append(points[i][1])
+                    curr_points_x.append(target_points[i][0])
+                    curr_points_y.append(target_points[i][1])
                     curr_colors.append(best_matchs_indexes[slice_to_cluster[slc_name]])
                 ax.scatter(curr_points_x,curr_points_y,marker = '.',c=curr_colors)
                 plt.savefig(im_path_target)
