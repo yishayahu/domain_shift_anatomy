@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     if True:
-        ckpt_name = getattr(cfg,'CKPT_NAME','model_sgd_no_zoom')
+        ckpt_name = getattr(cfg,'CKPT_NAME','model_sgd')
         base_ckpt_path = os.path.join(base_split_dir,f'site_{opts.source}',f'{ckpt_name}.pth')
         optim_state_dict_path = os.path.join(base_split_dir,'sources',f'source_{opts.source}','optimizer_sgd.pth')
     else:

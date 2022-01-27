@@ -87,8 +87,11 @@ def f(xxxx,points,slc_to_seg,slice_to_feature_source,slice_to_feature_target,vox
     da1,da2,clus_a, n_clus,d1,d2 = xxxx
 
     curr_points = points.copy()
+
     da1 = da1(d1)
     da2 = da2(d2)
+    if 'NMF' in str(da1):
+        curr_points -= np.min(curr_points)
     print(f'{da1},{da2},{clus_a}, {n_clus},{d1},{d2}')
     curr_points = da1.fit_transform(curr_points)
     curr_points = da2.fit_transform(curr_points)
@@ -129,10 +132,12 @@ def f(xxxx,points,slc_to_seg,slice_to_feature_source,slice_to_feature_target,vox
 def main():
     points,slc_to_seg,all1,slice_to_feature_source,slice_to_feature_target = prepare()
     f1 = partial(f,slice_to_feature_source=slice_to_feature_source,slice_to_feature_target=slice_to_feature_target,voxel_spacing = (1, 0.95, 0.95),slc_to_seg=slc_to_seg,points=points)
+    resres = []
     with Pool(processes=4) as pool:
-        results = pool.map_async(f1, all1)
-
-        json.dump(list(results.get()),open('resres.json','w'))
+        for i in range(0,len(all1),4):
+            results = pool.map_async(f1, all1[i:i+4])
+            resres+=list(results.get())
+            pickle.dump(resres,open('resres.json','wb'))
 if __name__ == '__main__':
 
     main()

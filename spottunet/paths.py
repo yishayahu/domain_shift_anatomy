@@ -2,7 +2,8 @@ from .utils import choose_root
 
 
 DATA_PATH = choose_root(
-    '/home/dsi/shaya/cc359_data/CC359/'
+    '/home/dsi/shaya/cc359_data/CC359/',
+    r'C:\Users\Y\PycharmProjects\cc359_data\CC359'
 )
 
 
