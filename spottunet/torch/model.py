@@ -109,7 +109,7 @@ def get_best_match(sc, tc):
     return best_match
 
 def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.inf, logger: Logger = None,
-          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14, **kwargs):
+          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14,accumulate=False, **kwargs):
     """
     Performs a series of train and validation steps.
 
@@ -159,11 +159,16 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
     target_clusters = None
     best_matchs = None
     best_matchs_indexes = None
+    accumulate_for_loss = None
     with batch_iter as iterator:
         try:
             while epoch < n_epochs:
                 slice_to_feature_source = {}
                 slice_to_feature_target = {}
+                if accumulate:
+                    accumulate_for_loss = []
+                    for _ in range(n_clusters):
+                        accumulate_for_loss.append([])
                 vizviz = {}
                 broadcast_event(Policy.epoch_started, epoch)
                 train_losses = []
@@ -178,7 +183,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                                     target_clusters=target_clusters,
                                     best_matchs=best_matchs,
                                     best_matchs_indexes=best_matchs_indexes,
-                                    vizviz=vizviz)
+                                    vizviz=vizviz,accumulate_for_loss=accumulate_for_loss)
                     train_losses.append(loss)
                     broadcast_event(Policy.train_step_finished, epoch, idx, train_losses[-1])
 
@@ -301,7 +306,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             pass
 
 def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None,dist_loss_lambda=1, **optimizer_params):
+                     alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None,dist_loss_lambda=1,accumulate_for_loss, **optimizer_params):
+
     architecture.train()
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets,domains,patient_ids,slice_nums = inputs[0:1], inputs[1:2],inputs[2].flatten(),inputs[3].flatten().int(),inputs[4].flatten().int()
@@ -316,8 +322,10 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
             slice_to_feature_target[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
                 dist_loss_counter+=1
-                # dist_loss += torch.min(torch.abs(best_matchs-feature).flatten(1).mean(1))
-                dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
+                if accumulate_for_loss is None:
+                    dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
+                else:
+                    accumulate_for_loss[slice_to_cluster[f'{pi}_{sn}']].append(feature)
                 src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
                 if f'target_{src_cluster}' not in vizviz or len(vizviz[f'target_{src_cluster}']) < 4:
                     if f'target_{src_cluster}' not in vizviz:
@@ -340,8 +348,19 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     im_path =  f'source_{src_cluster}_{train_step_logger._experiment.step}_{len(vizviz[f"source_{src_cluster}"])}.png'
                     img.save(im_path)
                     log_log[f'{src_cluster}/source_{len(vizviz[f"source_{src_cluster}"])}'] = wandb.Image(im_path)
-            # if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
-            #     dist_loss+= torch.mean(torch.abs(feature - source_clusters[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
+    if accumulate_for_loss is not None:
+        use_dist_loss = False
+        lens1 = [len(x) for x in accumulate_for_loss]
+        if np.sum(lens1) > 25:
+            use_dist_loss = True
+
+        if use_dist_loss:
+            for i,features in enumerate(accumulate_for_loss):
+                if len(features) > 0:
+                    features = torch.mean(torch.stack(features),dim=0)
+                    dist_loss+= torch.mean(torch.abs(features - best_matchs[i].to(logits.device)))
+                    accumulate_for_loss[i] = []
+
     log_log['dist_loss_counter'] = dist_loss_counter
     wandb.log(log_log, step=train_step_logger._experiment.step)
     loss = criterion(logits, *targets)
@@ -356,8 +375,24 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
         optimizer_step(optimizer, loss[loss_key], **optimizer_params)
         return dmap(to_np, loss)
     if type(loss) == dict:
-        optimizer_step(optimizer, loss['total_loss_'], **optimizer_params)
-        loss = {k: float(v) for (k, v) in loss.items()}
+        if accumulate_for_loss is None:
+            optimizer_step(optimizer, loss['total_loss_'], **optimizer_params)
+            loss = {k: float(v) for (k, v) in loss.items()}
+        else:
+            if use_dist_loss:
+                set_params(optimizer, **optimizer_params)
+                loss_dict['total_loss_'].backward()
+                optimizer.step()
+                optimizer.zero_grad()
+            elif best_matchs is None:
+                set_params(optimizer, **optimizer_params)
+                loss_dict['loss'].backward()
+                optimizer.step()
+                optimizer.zero_grad()
+            else:
+                loss_dict['loss'].backward(retain_graph=True)
+            loss = loss_dict
+            loss = {k: float(v) for (k, v) in loss.items()}
     else:
         optimizer_step(optimizer, loss, **optimizer_params)
         loss = to_np(loss)

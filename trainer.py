@@ -130,11 +130,17 @@ if __name__ == '__main__':
     shutil.copy(cfg_path,os.path.join(exp_dir,'config.yml'))
 
     train_ids = load(os.path.join(splits_dir,'train_ids.json'))
+    ids_sampling_weights = None
     if getattr(cfg,'ADD_SOURCE_IDS',False):
+        ids_sampling_weights = [3]* len(train_ids)
+        source_train_ids_path = os.path.join(base_split_dir,f'site_{opts.source}')
         if msm:
-            train_ids = load(os.path.join(base_split_dir,f'site_{opts.source}t','train_ids.json')) + train_ids
-        else:
-            train_ids = load(os.path.join(base_split_dir,f'site_{opts.source}','train_ids.json')) + train_ids
+            source_train_ids_path+='t'
+        source_train_ids = load(os.path.join(source_train_ids_path,'train_ids.json'))
+        ids_sampling_weights = ([1] * len(source_train_ids)) + ids_sampling_weights
+        if not getattr(cfg,'ACCUMULATE',False):
+            ids_sampling_weights = None
+        train_ids = source_train_ids+train_ids
 
     test_ids = load(os.path.join(splits_dir,'test_ids.json'))
     if getattr(cfg,'TRAIN_ON_TEST',False):
@@ -330,7 +336,7 @@ if __name__ == '__main__':
 
 
 
-    ids_sampling_weights = None
+
 
 
 
