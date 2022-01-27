@@ -91,7 +91,6 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
 
 def get_best_match_aux(distss):
     n_clusters = len(distss)
-    print('n_clusterss',n_clusters)
     res = linear_sum_assignment(distss)[1].tolist()
     targets = [None] *n_clusters
     for x,y in enumerate(res):
@@ -104,11 +103,8 @@ def get_best_match(sc, tc):
     for i in range(sc.shape[0]):
         for j in range(tc.shape[0]):
             dists[i][j] = np.mean(np.abs(sc[i]-tc[j]))
-    print('looking for best match')
-    pickle.dump(dists,open('dists.p','wb'))
     best_match = get_best_match_aux(dists.copy())
-    pickle.dump(best_match,open('best_match.p','wb'))
-    print('best match found')
+
 
     return best_match
 

@@ -29,7 +29,15 @@ def choose_root(*paths: PathLike) -> Path:
     raise FileNotFoundError('No appropriate root found.')
 
 
-def sdice(a, b, spacing, tolerance):
+def sdice(a, b, spacing, tolerance,for_clcc=False):
+    if for_clcc:
+        a_zeros  =np.count_nonzero(a)
+        b_zeros  =np.count_nonzero(b)
+        if  a_zeros ==0  and b_zeros == 0:
+            return 1
+        elif a_zeros == 0 or b_zeros == 0:
+            a[0][0] = True
+            b[0][0] = True
     surface_distances = surf_dc.compute_surface_distances(a, b, spacing)
     return surf_dc.compute_surface_dice_at_tolerance(surface_distances, tolerance)
 
