@@ -108,6 +108,7 @@ class LoadByClusterId:
     def __init__(self):
         self.cluster_to_ids = {}
         self.current_cluster = None
+        self.yileding_by_cluster = False
     def __call__(self,*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
                           random_state: Union[np.random.RandomState, int] = None):
         """
@@ -130,15 +131,19 @@ class LoadByClusterId:
         while True:
 
             if self.current_cluster is not None:
+                self.yileding_by_cluster = True
                 id_ = np.random.choice(self.cluster_to_ids[self.current_cluster])
 
-            else:
-                id_ = next(samplers['all'])
+                yield squeeze_first(tuple(pam(loaders, id_)))
+            self.yileding_by_cluster = False
+            id_ = next(samplers['all'])
             yield squeeze_first(tuple(pam(loaders, id_)))
+
 
 
 class GetByClusterSlice:
     def __init__(self):
+        self.cluster_id_loader = None
         self.cluster_to_id_slices = {}
         self.current_cluster = None
     def __call__(self,*arrays, interval: int = 1,msm=False):
@@ -147,7 +152,7 @@ class GetByClusterSlice:
             slc = np.random.randint(arrays[0].shape[0] // interval) * interval
             if len(arrays) > 2:
                 domain,id1 = arrays[2:]
-                if self.current_cluster is not None:
+                if self.current_cluster is not None and self.cluster_id_loader.yileding_by_cluster:
                     slc = np.random.choice(self.cluster_to_id_slices[self.current_cluster]['CC0' + str(id1)])
                 arrays = arrays[:2]
                 return tuple([array[slc] for array in arrays] + [domain,id1,slc])
@@ -156,7 +161,7 @@ class GetByClusterSlice:
         slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
         if len(arrays) > 2:
             domain,id1 = arrays[2:]
-            if self.current_cluster is not None:
+            if self.current_cluster is not None and self.cluster_id_loader.yileding_by_cluster:
                 slc = np.random.choice(self.cluster_to_id_slices[self.current_cluster]['CC0' + str(id1)])
             arrays = arrays[:2]
             return tuple([array[..., slc] for array in arrays] + [domain,id1,slc])

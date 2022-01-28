@@ -144,6 +144,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
     if load_by_cluster_id:
         id_getter = kwargs.pop('id_getter')
         slc_getter = kwargs.pop('slc_getter')
+        slc_getter.cluster_id_loader = id_getter
     if checkpoints is None:
         checkpoints = _DummyCheckpoints()
     if logger is None:
@@ -227,7 +228,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 for i in range(len(slice_to_feature_source)):
                     source_clusters[sc[i]].append(items[i][1])
                     slice_to_cluster[items[i][0]] = sc[i]
-                    slice_to_cluster_to_load_by_cluster_id[items[i][0]] = sc[i]
+
                     source_amounts[sc[i]] += 1
 
 
@@ -235,7 +236,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 for i in range(len(slice_to_feature_target)):
                     target_clusters[tc[i]].append(items[i][1])
                     slice_to_cluster[items[i][0]] = tc[i]
-                    slice_to_cluster_to_load_by_cluster_id[items[i][0]] = best_matchs_indexes[tc[i]]
+                    slice_to_cluster_to_load_by_cluster_id[items[i][0]] = tc[i]
                     target_amounts[tc[i]] += 1
                 for i in range(len(source_clusters)):
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
@@ -344,12 +345,9 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
 
     logits,features = architecture(*inputs)
     if load_by_cluster_id and best_matchs is not None:
-
-        assert len(set([slice_to_cluster[f'{pi}_{sn}'] for d,pi,sn in zip(domains,patient_ids,slice_nums) if d == target_domain])) == 1
-        assert len(set([slice_to_cluster[f'{pi}_{sn}'] for d,pi,sn in zip(domains,patient_ids,slice_nums) if d != target_domain])) == 1
-
+        lst = [slice_to_cluster[f'{pi}_{sn}'] for d,pi,sn in zip(domains,patient_ids,slice_nums) if d == target_domain and f'{pi}_{sn}' in slice_to_cluster]
+        most_common_target = max(set(lst), key=lst.count)
         stacked = []
-        clus = -1
     features = features.mean(1)
     loss_dict = {}
     dist_loss = torch.tensor(0.0,device=logits.device)
@@ -363,8 +361,9 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                 if accumulate_for_loss is None and not load_by_cluster_id:
                     dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
                 elif load_by_cluster_id:
-                    stacked.append(feature)
-                    clus = slice_to_cluster[f'{pi}_{sn}']
+                    if slice_to_cluster[f'{pi}_{sn}'] == most_common_target:
+                        stacked.append(feature)
+
                 else:
                     accumulate_for_loss[slice_to_cluster[f'{pi}_{sn}']].append(feature)
                 src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
@@ -402,7 +401,8 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     dist_loss+= torch.mean(torch.abs(features - best_matchs[i].to(logits.device)))
                     accumulate_for_loss[i] = []
     if load_by_cluster_id and best_matchs is not None:
-        dist_loss = torch.mean(torch.abs(torch.mean(torch.stack(stacked,dim=0),dim=0) - best_matchs[clus].to(logits.device)))
+        if stacked:
+            dist_loss = torch.mean(torch.abs(torch.mean(torch.stack(stacked,dim=0),dim=0) - best_matchs[most_common_target].to(logits.device)))
     log_log['dist_loss_counter'] = dist_loss_counter
     wandb.log(log_log, step=train_step_logger._experiment.step)
     loss = criterion(logits, *targets)

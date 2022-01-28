@@ -169,6 +169,12 @@ def main():
 
 def analtyze():
     resres = pickle.load(open('resres.json', 'rb'))
+    resres2 = []
+    for x in resres:
+        resres2.append((x[0],(np.mean((x[1][0],x[1][1])),x[1][2])))
+
+    z = sorted(resres2,reverse=True,key=lambda x:x[1][1])
+    z2 = sorted(resres2,key=lambda x:x[1][0])
     x=42
 
 if __name__ == '__main__':
