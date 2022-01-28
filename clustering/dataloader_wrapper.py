@@ -1,65 +1,31 @@
+import numpy as np
 import torch
 class DataLoaderWrapper(torch.utils.data.DataLoader):
-    def __init__(self,dataloader_creator):
-        self.dataloader_creator = dataloader_creator
-        self.dataloader_kwargs = {}
-    def recreate(self,**dataloader_kwargs):
-        for key,val in dataloader_kwargs.items():
-            self.dataloader_kwargs[key] = val
-        self.dl = self.dataloader_creator(**self.dataloader_kwargs)
-        return self
+    def __init__(self,source, *transformers,
+                 batch_size , batches_per_epoch: int):
+
+        self.source  = source
+        self.batch_size = batch_size
+        self.batches_per_epoch = batches_per_epoch
+        self.transformers = transformers
     def __call__(self):
         return self
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
-    @property
-    def _dataset_kind(self):
-        return self.dl._dataset_kind
+    def __iter__(self):
+        for b in range(self.batches_per_epoch):
+            currs = []
+            for i in range(5):
+                currs.append([])
+            for i in range(self.batch_size):
+                id1 = next(self.source)
+                for t in self.transformers:
+                    id1 = t(id1)
+                for j in range(len(id1)):
+                    currs[j].append(id1[j])
 
-    @property
-    def batch_sampler(self):
-        return self.dl.batch_sampler
-    @property
-    def persistent_workers(self):
-        return self.dl.persistent_workers
-    @property
-    def num_workers(self):
-        return self.dl.num_workers
-
-    @property
-    def dataset(self):
-        return self.dl.dataset
-
-    @property
-    def _IterableDataset_len_called(self):
-        return self.dl._IterableDataset_len_called
-
-    @property
-    def drop_last(self):
-        return self.dl.drop_last
-
-    @property
-    def prefetch_factor(self):
-        return self.dl.prefetch_factor
-
-    @property
-    def _prefetch_factor(self):
-        return self.dl._prefetch_factor
-    @property
-    def pin_memory(self):
-        return self.dl.pin_memory
-    @property
-    def timeout(self):
-        return self.dl.timeout
-    @property
-    def collate_fn(self):
-        return self.dl.collate_fn
-
-    @property
-    def generator(self):
-        return self.dl.generator
-    @property
-    def sampler(self):
-        return self.dl.sampler
+            for i in range(5):
+                currs[i] = np.stack(currs[i])
+            yield currs

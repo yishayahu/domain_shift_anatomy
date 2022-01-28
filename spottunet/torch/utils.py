@@ -104,6 +104,65 @@ def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[floa
         epoch+=1
 
 
+class LoadByClusterId:
+    def __init__(self):
+        self.cluster_to_ids = {}
+        self.current_cluster = None
+    def __call__(self,*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
+                          random_state: Union[np.random.RandomState, int] = None):
+        """
+        Infinitely yield objects loaded by ``loaders`` according to the identifier from ``ids``.
+        The identifiers are randomly sampled from ``ids`` according to the ``weights``.
+
+        Parameters
+        ----------
+        loaders: Callable
+            function, which loads object by its id.
+        ids: Sequence
+            the sequence of identifiers to sample from.
+        weights: Sequence[float], None, optional
+            The weights associated with each id. If ``None``, the weights are assumed to be equal.
+            Should be the same size as ``ids``.
+        random_state: int, np.random.RandomState, None, optional
+            if not ``None``, used to set the random seed for reproducibility reasons.
+        """
+        samplers = {'all':sample(ids, weights, random_state)}
+        while True:
+
+            if self.current_cluster is not None:
+                id_ = np.random.choice(self.cluster_to_ids[self.current_cluster])
+
+            else:
+                id_ = next(samplers['all'])
+            yield squeeze_first(tuple(pam(loaders, id_)))
+
+
+class GetByClusterSlice:
+    def __init__(self):
+        self.cluster_to_id_slices = {}
+        self.current_cluster = None
+    def __call__(self,*arrays, interval: int = 1,msm=False):
+        if msm:
+
+            slc = np.random.randint(arrays[0].shape[0] // interval) * interval
+            if len(arrays) > 2:
+                domain,id1 = arrays[2:]
+                if self.current_cluster is not None:
+                    slc = np.random.choice(self.cluster_to_id_slices[self.current_cluster]['CC0' + str(id1)])
+                arrays = arrays[:2]
+                return tuple([array[slc] for array in arrays] + [domain,id1,slc])
+            else:
+                return tuple(array[slc] for array in arrays)
+        slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
+        if len(arrays) > 2:
+            domain,id1 = arrays[2:]
+            if self.current_cluster is not None:
+                slc = np.random.choice(self.cluster_to_id_slices[self.current_cluster]['CC0' + str(id1)])
+            arrays = arrays[:2]
+            return tuple([array[..., slc] for array in arrays] + [domain,id1,slc])
+        else:
+            return tuple(array[..., slc] for array in arrays)
+
 def tensor_to_image(tensor):
     tensor = tensor*255
     tensor = tensor.detach().cpu()

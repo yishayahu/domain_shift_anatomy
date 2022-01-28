@@ -1,0 +1,33 @@
+NUM_EPOCHS: 30
+BATCHES_PER_EPOCH: 1000
+ADD_SOURCE_IDS: True
+FREEZE_FUNC:
+  FUNC: "freeze_model"
+  exclude_layers: [ 'init_path', 'down','bottleneck' ]
+UNSUP: True
+LOAD_BY_CLUSTER_ID: True
+LR_INIT: 0.0001
+SAMPLE_FUNC:
+  FUNC: LoadByClusterId
+  as_class: True
+GET_SLICE_FUNC:
+  FUNC: GetByClusterSlice
+  as_class: True
+
+
+TRAIN_STEP_FUNC:
+  FUNC: train_step_unsup
+  target_domain: target
+  dist_loss_lambda: 0.1
+SECOND_ROUND:
+  CRITERION:
+    FUNC: weighted_cross_entropy_with_logits
+    reduce:
+  TRAIN_FUNC:
+    FUNC: train_unsup
+    n_clusters: 50
+    load_by_cluster_id: True
+    id_getter: sample_func
+    slc_getter: get_random_slice_func
+
+

@@ -109,7 +109,7 @@ def get_best_match(sc, tc):
     return best_match
 
 def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.inf, logger: Logger = None,
-          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14,accumulate=False, **kwargs):
+          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14,accumulate=False,load_by_cluster_id=False, **kwargs):
     """
     Performs a series of train and validation steps.
 
@@ -141,7 +141,9 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
     def broadcast_event(method, *args, **kw):
         for name, policy in policies.items():
             getattr(policy, method.__name__)(*args, **kw)
-
+    if load_by_cluster_id:
+        id_getter = kwargs.pop('id_getter')
+        slc_getter = kwargs.pop('slc_getter')
     if checkpoints is None:
         checkpoints = _DummyCheckpoints()
     if logger is None:
@@ -183,7 +185,14 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                                     target_clusters=target_clusters,
                                     best_matchs=best_matchs,
                                     best_matchs_indexes=best_matchs_indexes,
-                                    vizviz=vizviz,accumulate_for_loss=accumulate_for_loss)
+                                    vizviz=vizviz,accumulate_for_loss=accumulate_for_loss,load_by_cluster_id=load_by_cluster_id)
+                    if load_by_cluster_id:
+                        if id_getter.current_cluster is not None:
+                            id_getter.current_cluster +=1
+                            slc_getter.current_cluster +=1
+                            if id_getter.current_cluster == n_clusters:
+                                id_getter.current_cluster= 0
+                                slc_getter.current_cluster = 0
                     train_losses.append(loss)
                     broadcast_event(Policy.train_step_finished, epoch, idx, train_losses[-1])
 
@@ -210,6 +219,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 print('getting best match')
                 best_matchs_indexes=get_best_match(k1.cluster_centers_,k2.cluster_centers_)
                 slice_to_cluster = {}
+                slice_to_cluster_to_load_by_cluster_id = {}
                 source_amounts = [0]*  n_clusters
                 target_amounts = [0]*  n_clusters
                 items = list(slice_to_feature_source.items())
@@ -217,6 +227,7 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 for i in range(len(slice_to_feature_source)):
                     source_clusters[sc[i]].append(items[i][1])
                     slice_to_cluster[items[i][0]] = sc[i]
+                    slice_to_cluster_to_load_by_cluster_id[items[i][0]] = sc[i]
                     source_amounts[sc[i]] += 1
 
 
@@ -224,10 +235,29 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                 for i in range(len(slice_to_feature_target)):
                     target_clusters[tc[i]].append(items[i][1])
                     slice_to_cluster[items[i][0]] = tc[i]
+                    slice_to_cluster_to_load_by_cluster_id[items[i][0]] = best_matchs_indexes[tc[i]]
                     target_amounts[tc[i]] += 1
                 for i in range(len(source_clusters)):
                     source_clusters[i] = np.mean(source_clusters[i],axis=0)
                     target_clusters[i] = np.mean(target_clusters[i],axis=0)
+                if load_by_cluster_id:
+                    cluster_to_ids = {}
+                    cluster_to_id_slices = {}
+                    for id_slc,c_num in slice_to_cluster_to_load_by_cluster_id.items():
+                        id1, slc_num = id_slc.split('_')
+                        id1 = 'CC0' + id1
+                        slc_num = int(slc_num)
+                        if c_num not in cluster_to_ids:
+                            cluster_to_ids[c_num] = []
+                            cluster_to_id_slices[c_num] = {}
+                        cluster_to_ids[c_num].append(id1)
+                        if id1 not in cluster_to_id_slices[c_num]:
+                            cluster_to_id_slices[c_num][id1] = []
+                        cluster_to_id_slices[c_num][id1].append(slc_num)
+                    slc_getter.cluster_to_id_slices =  cluster_to_id_slices
+                    id_getter.cluster_to_ids = cluster_to_ids
+                    id_getter.current_cluster = 0
+                    slc_getter.current_cluster = 0
                 # pictures
                 cm = plt.get_cmap('gist_rainbow')
                 cNorm  = mplcolors.Normalize(vmin=0, vmax=n_clusters-1)
@@ -306,12 +336,20 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
             pass
 
 def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-                     alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None,dist_loss_lambda=1,accumulate_for_loss, **optimizer_params):
+                     alpha_l2sp=None,best_matchs, reference_architecture=None,vizviz=None,best_matchs_indexes=None, train_step_logger=None,load_by_cluster_id=False,use_clustering_curriculum=False,batch_iter_step=None,target_domain=None,slice_to_feature_source=None,slice_to_cluster=None,slice_to_feature_target=None,source_clusters=None,target_clusters=None,dist_loss_lambda=1,accumulate_for_loss, **optimizer_params):
 
     architecture.train()
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets,domains,patient_ids,slice_nums = inputs[0:1], inputs[1:2],inputs[2].flatten(),inputs[3].flatten().int(),inputs[4].flatten().int()
+
     logits,features = architecture(*inputs)
+    if load_by_cluster_id and best_matchs is not None:
+
+        assert len(set([slice_to_cluster[f'{pi}_{sn}'] for d,pi,sn in zip(domains,patient_ids,slice_nums) if d == target_domain])) == 1
+        assert len(set([slice_to_cluster[f'{pi}_{sn}'] for d,pi,sn in zip(domains,patient_ids,slice_nums) if d != target_domain])) == 1
+
+        stacked = []
+        clus = -1
     features = features.mean(1)
     loss_dict = {}
     dist_loss = torch.tensor(0.0,device=logits.device)
@@ -322,8 +360,11 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
             slice_to_feature_target[f'{pi}_{sn}'] =feature.detach().cpu().numpy()
             if best_matchs is not None and f'{pi}_{sn}' in slice_to_cluster:
                 dist_loss_counter+=1
-                if accumulate_for_loss is None:
+                if accumulate_for_loss is None and not load_by_cluster_id:
                     dist_loss+= torch.mean(torch.abs(feature - best_matchs[slice_to_cluster[f'{pi}_{sn}']].to(logits.device)))
+                elif load_by_cluster_id:
+                    stacked.append(feature)
+                    clus = slice_to_cluster[f'{pi}_{sn}']
                 else:
                     accumulate_for_loss[slice_to_cluster[f'{pi}_{sn}']].append(feature)
                 src_cluster = best_matchs_indexes[slice_to_cluster[f'{pi}_{sn}']]
@@ -360,7 +401,8 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     features = torch.mean(torch.stack(features),dim=0)
                     dist_loss+= torch.mean(torch.abs(features - best_matchs[i].to(logits.device)))
                     accumulate_for_loss[i] = []
-
+    if load_by_cluster_id and best_matchs is not None:
+        dist_loss = torch.mean(torch.abs(torch.mean(torch.stack(stacked,dim=0),dim=0) - best_matchs[clus].to(logits.device)))
     log_log['dist_loss_counter'] = dist_loss_counter
     wandb.log(log_log, step=train_step_logger._experiment.step)
     loss = criterion(logits, *targets)

@@ -50,8 +50,7 @@ from dpipe.train.policy import Schedule, TQDM
 from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
-from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func, \
-    load_by_gradual_id, freeze_model_spottune, modify_state_fn_spottune
+from spottunet.torch.utils import *
 
 
 class Config:
@@ -172,7 +171,7 @@ if __name__ == '__main__':
 
     if opts.exp_name == 'debug':
         print('debug mode')
-        batches_per_epoch = 15
+        batches_per_epoch = 5
         batch_size = 10
         project = 'spot3'
         random.shuffle(train_ids)
@@ -210,6 +209,7 @@ if __name__ == '__main__':
     architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16,get_bottleneck=getattr(cfg,'UNSUP',False)) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
+    get_random_slice_func = getattr(cfg,'GET_SLICE_FUNC',get_random_slice)
     if not opts.train_only_source:
         print(f'loading ckpt from {base_ckpt_path}')
         load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
@@ -238,13 +238,14 @@ if __name__ == '__main__':
     else:
         reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
+    sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
+    if 'load_by_gradual_id' in str(type(sample_func)):
+        sample_func = partial(sample_func,ts_size=opts.ts_size if opts.ts_size != 0 else 1)
     cfg.second_round()
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
     if type(lr) == partial:
         lr = lr()
-    sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
-    if 'load_by_gradual_id' in str(type(sample_func)):
-        sample_func = partial(sample_func,ts_size=opts.ts_size if opts.ts_size != 0 else 1)
+
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
@@ -341,7 +342,9 @@ if __name__ == '__main__':
 
 
 
+
     x_patch_size = y_patch_size = np.array([256, 256])
+    load_by_cluster_id = getattr(cfg,'LOAD_BY_CLUSTER_ID',False)
     if clustering:
         split_source = getattr(cfg,'SPLIT_SOURCE',False)
         train_dataset = DsWrapper(model=architecture,ids=train_ids,ds=dataset, dataset_creator=CC359Ds,
@@ -355,23 +358,43 @@ if __name__ == '__main__':
             num_workers=0, pin_memory=True, sampler=train_dataset.current_sampler)
         train_kwargs['batch_iter_step'] = batch_iter
     elif msm:
-        batch_iter = Infinite(
-            sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
-                        weights=ids_sampling_weights, random_state=seed),
-            unpack_args(get_random_slice, interval=slice_sampling_interval,msm=True),
-            multiply(np.float32),
-            batch_size=batch_size, batches_per_epoch=batches_per_epoch
-        )
+        if load_by_cluster_id:
+            batch_iter = DataLoaderWrapper(
+                sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
+                            weights=ids_sampling_weights, random_state=seed),
+                unpack_args(get_random_slice_func, interval=slice_sampling_interval,msm=True),
+                multiply(np.float32),
+                batch_size=batch_size, batches_per_epoch=batches_per_epoch
+            )
+        else:
+            batch_iter = Infinite(
+                sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
+                            weights=ids_sampling_weights, random_state=seed),
+                unpack_args(get_random_slice_func, interval=slice_sampling_interval,msm=True),
+                multiply(np.float32),
+                batch_size=batch_size, batches_per_epoch=batches_per_epoch
+            )
     else:
-        batch_iter = Infinite(
-            sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
-                              weights=ids_sampling_weights, random_state=seed),
-            unpack_args(get_random_slice, interval=slice_sampling_interval),
-            unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
-            multiply(prepend_dims),
-            multiply(np.float32),
-            batch_size=batch_size, batches_per_epoch=batches_per_epoch
-        )
+        if load_by_cluster_id:
+            batch_iter = DataLoaderWrapper(
+                sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
+                            weights=ids_sampling_weights, random_state=seed),
+                unpack_args(get_random_slice_func, interval=slice_sampling_interval),
+                unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
+                multiply(prepend_dims),
+                multiply(np.float32),
+                batch_size=batch_size, batches_per_epoch=batches_per_epoch
+            )
+        else:
+            batch_iter = Infinite(
+                sample_func(dataset.load_image, dataset.load_segm,dataset.load_domain_label_number,dataset.load_id, ids=train_ids,
+                                  weights=ids_sampling_weights, random_state=seed),
+                unpack_args(get_random_slice_func, interval=slice_sampling_interval),
+                unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
+                multiply(prepend_dims),
+                multiply(np.float32),
+                batch_size=batch_size, batches_per_epoch=batches_per_epoch
+            )
 
     train_model = partial(getattr(cfg,'TRAIN_FUNC',train),
         train_step=train_step_func,

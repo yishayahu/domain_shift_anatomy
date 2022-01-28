@@ -156,7 +156,7 @@ def main():
     #     metric = 'dice'
     #     data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
     #     run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
-    experiments = ['unsup', 'adaBN', 'only_test']
+    experiments = ['adaBN', 'only_test']
     combs = list(itertools.permutations(range(6), 2))
     random.shuffle(combs)
     metric = 'sdice_score'

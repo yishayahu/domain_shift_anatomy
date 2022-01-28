@@ -109,6 +109,7 @@ def main():
     cli.add_argument("--target")
     cli.add_argument("--msm", default=False)
     opts = cli.parse_args()
+    fix_seed(42)
     base_res_dir = st_res_dir if not opts.msm else msm_res_dir
     base_split_dir = st_splits_dir if not opts.msm else msm_splits_dir
     metric = 'sdice_score' if not opts.msm else 'dice'
