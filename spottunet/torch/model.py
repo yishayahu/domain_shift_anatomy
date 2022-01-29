@@ -189,8 +189,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                                     vizviz=vizviz,accumulate_for_loss=accumulate_for_loss,load_by_cluster_id=load_by_cluster_id)
                     if load_by_cluster_id:
                         if id_getter.current_cluster is not None:
-                            id_getter.current_cluster +=1
-                            slc_getter.current_cluster +=1
+                            id_getter.current_cluster =random.randint(0,n_clusters)
+                            slc_getter.current_cluster = random.randint(0,n_clusters)
                             if id_getter.current_cluster == n_clusters:
                                 id_getter.current_cluster= 0
                                 slc_getter.current_cluster = 0

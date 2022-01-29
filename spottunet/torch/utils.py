@@ -127,7 +127,7 @@ class LoadByClusterId:
         random_state: int, np.random.RandomState, None, optional
             if not ``None``, used to set the random seed for reproducibility reasons.
         """
-        samplers = {'all':sample(ids, weights, random_state)}
+        samplers = {'all':sample(ids, weights, random_state),'source':sample(ids[:45], weights, random_state)}
         while True:
 
             if self.current_cluster is not None:
@@ -135,9 +135,13 @@ class LoadByClusterId:
                 id_ = np.random.choice(self.cluster_to_ids[self.current_cluster])
 
                 yield squeeze_first(tuple(pam(loaders, id_)))
-            self.yileding_by_cluster = False
-            id_ = next(samplers['all'])
-            yield squeeze_first(tuple(pam(loaders, id_)))
+                self.yileding_by_cluster = False
+                id_ = next(samplers['source'])
+                yield squeeze_first(tuple(pam(loaders, id_)))
+            else:
+                self.yileding_by_cluster = False
+                id_ = next(samplers['all'])
+                yield squeeze_first(tuple(pam(loaders, id_)))
 
 
 

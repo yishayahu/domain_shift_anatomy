@@ -25,7 +25,7 @@ SECOND_ROUND:
     reduce:
   TRAIN_FUNC:
     FUNC: train_unsup
-    n_clusters: 50
+    n_clusters: 12
     load_by_cluster_id: True
     id_getter: sample_func
     slc_getter: get_random_slice_func

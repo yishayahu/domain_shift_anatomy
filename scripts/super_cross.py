@@ -24,7 +24,7 @@ from spottunet.paths import st_splits_dir, st_res_dir, msm_res_dir, msm_splits_d
 def find_available_device(my_devices, running_now):
     if torch.cuda.is_available():
 
-        wanted_free_mem = 6 * 2 ** 30  # at least 16 GB avail
+        wanted_free_mem = 26 * 2 ** 30  # at least 16 GB avail
         while True:
             for device_num in range(nvmlDeviceGetCount()):
                 if f'cuda:{device_num}' in my_devices:
@@ -156,7 +156,7 @@ def main():
     #     metric = 'dice'
     #     data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
     #     run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
-    experiments = ['adaBN', 'only_test']
+    experiments = ['unsup_acc','unsup']
     combs = list(itertools.permutations(range(6), 2))
     random.shuffle(combs)
     metric = 'sdice_score'
