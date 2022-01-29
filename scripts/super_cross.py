@@ -53,6 +53,8 @@ def run_single_exp(exp, device, source, target, sdice_path, my_devices, ret_valu
                 cmd = f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} >  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd, shell=True, check=True)
+            if os.path.isdir(sdice_path):
+                sdice_path = os.path.join(sdice_path,'sdice_score.json')
             sdice = json.load(open(sdice_path))
             if type(sdice) != float:
                 sdice = np.mean(list(sdice.values()))
@@ -119,6 +121,8 @@ def run_cross_validation(experiments, combs, metric, do_msm, only_stats=False):
                     time.sleep(5)
                 else:
                     print(f'loading exists on source {source} target {target} exp {exp}')
+                    if os.path.isdir(sdice_path):
+                        sdice_path = os.path.join(sdice_path,'sdice_score.json')
                     sdice = json.load(open(sdice_path))
                     if type(sdice) != float:
                         sdice = np.mean(list(json.load(open(sdice_path)).values()))
@@ -156,7 +160,7 @@ def main():
     #     metric = 'dice'
     #     data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
     #     run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
-    experiments = ['unsup_acc','adaBN']
+    experiments = ['unsup_acc','adaBN','unsup']
     combs = list(itertools.permutations(range(6), 2))
     random.shuffle(combs)
     metric = 'sdice_score'
