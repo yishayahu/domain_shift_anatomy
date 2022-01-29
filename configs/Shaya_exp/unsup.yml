@@ -5,7 +5,7 @@ FREEZE_FUNC:
   FUNC: "freeze_model"
   exclude_layers: [ 'init_path', 'down','bottleneck' ]
 UNSUP: True
-LR_INIT: 0.0001
+LR_INIT: 0.00001
 TRAIN_FUNC:
   FUNC: train_unsup
   n_clusters: 50
