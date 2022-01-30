@@ -42,7 +42,7 @@ def find_available_device(my_devices, running_now):
         return 'cpu'
 
 
-def run_single_exp(exp, device, source, target, sdice_path, my_devices, ret_value):
+def run_single_exp(exp, device, source, target, sdice_path,best_sdice_path, my_devices, ret_value):
     my_devices.append(device)
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
     with tempfile.NamedTemporaryFile() as out_file, tempfile.NamedTemporaryFile() as err_file:
@@ -53,11 +53,14 @@ def run_single_exp(exp, device, source, target, sdice_path, my_devices, ret_valu
                 cmd = f'python trainer.py --config {exp} --exp_name {exp} --device {device} --source {source} --target {target} >  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd, shell=True, check=True)
-            if os.path.isdir(sdice_path):
-                sdice_path = os.path.join(sdice_path,'sdice_score.json')
+
             sdice = json.load(open(sdice_path))
             if type(sdice) != float:
-                sdice = np.mean(list(sdice.values()))
+                sdice = np.mean(list(json.load(open(sdice_path)).values()))
+            best_sdice = json.load(open(best_sdice_path))
+            if type(sdice) != float:
+                best_sdice = np.mean(list(json.load(open(best_sdice_path)).values()))
+            sdice = max(sdice,best_sdice)
             ret_value.value = sdice
         except subprocess.CalledProcessError:
             print(f'error in exp {exp}_{source}_{target}')
@@ -102,6 +105,7 @@ def run_cross_validation(experiments, combs, metric, do_msm, only_stats=False):
                         my_devices.remove(curr_device)
                     os.rename(pp_model, src_ckpt_path)
                 sdice_path = f'{base_res_dir}/source_{source}_target_{target}/{exp}/best_test_metrics/{metric}.json'
+                best_sdice_path = f'{base_res_dir}/source_{source}_target_{target}/{exp}/test_metrics/{metric}.json'
                 if not os.path.exists(sdice_path):
                     if only_stats:
                         continue
@@ -115,17 +119,19 @@ def run_cross_validation(experiments, combs, metric, do_msm, only_stats=False):
                     print(f'lunch on source {source} target {target} exp {exp}')
                     ret_value = multiprocessing.Value("d", 0.0, lock=False)
                     p = Process(target=run_single_exp,
-                                args=(exp, curr_device, source, target, sdice_path, my_devices, ret_value))
+                                args=(exp, curr_device, source, target, sdice_path,best_sdice_path, my_devices, ret_value))
                     running_now.append([(exp, f's_{source} t_{target}'), p, ret_value])
                     p.start()
                     time.sleep(5)
                 else:
                     print(f'loading exists on source {source} target {target} exp {exp}')
-                    if os.path.isdir(sdice_path):
-                        sdice_path = os.path.join(sdice_path,'sdice_score.json')
                     sdice = json.load(open(sdice_path))
                     if type(sdice) != float:
                         sdice = np.mean(list(json.load(open(sdice_path)).values()))
+                    best_sdice = json.load(open(best_sdice_path))
+                    if type(sdice) != float:
+                        best_sdice = np.mean(list(json.load(open(best_sdice_path)).values()))
+                    sdice = max(sdice,best_sdice)
                     stats[exp][f's_{source} t_{target}'] = sdice
     still_running = running_now
     while still_running:
@@ -160,7 +166,7 @@ def main():
     #     metric = 'dice'
     #     data_split_path,res_path = paths.msm_splits_dir,paths.msm_res_dir
     #     run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
-    experiments = ['unsup_acc','adaBN','unsup']
+    experiments = ['adaBN']
     combs = list(itertools.permutations(range(6), 2))
     random.shuffle(combs)
     metric = 'sdice_score'

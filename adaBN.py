@@ -64,7 +64,7 @@ def run_adaBN(source, target, device, base_res_dir, base_split_dir, metric):
         unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
         multiply(prepend_dims),
         multiply(np.float32),
-        batch_size=80, batches_per_epoch=80  # change batch-size if needed
+        batch_size=16, batches_per_epoch=80  # change batch-size if needed
     )
     iter1 = batch_iter()
     model.train()
@@ -74,32 +74,32 @@ def run_adaBN(source, target, device, base_res_dir, base_split_dir, metric):
             out = model(batch_inp)
             loss1 = weighted_cross_entropy_with_logits(out, batch_seg)
             print(loss1)
-            dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
-            model.eval()
-            sdice_tolerance = 1
+    dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
+    model.eval()
+    sdice_tolerance = 1
 
-            @slicewise  # 3D -> 2D iteratively
-            @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
-            @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
-            def predict(image):
-                return inference_step(image, architecture=model, activation=torch.sigmoid)
+    @slicewise  # 3D -> 2D iteratively
+    @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
+    @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
+    def predict(image):
+        return inference_step(image, architecture=model, activation=torch.sigmoid)
 
-            load_x = dataset.load_image
-            load_y = dataset.load_segm
-            sdice_metric = lambda x, y, i: sdice(get_pred(x), get_pred(y), dataset.load_spacing(i), sdice_tolerance)
-            final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
-            evaluate_individual_metrics = partial(
-                evaluate_individual_metrics_probably_with_ids_no_pred,
-                load_y=load_y,
-                load_x=load_x,
-                predict=predict,
-                metrics=final_metrics,
-                test_ids=test_ids
-            )
-            p1 = Path(f'{base_res_dir}/source_{source}_target_{target}/adaBN/best_test_metrics/')
-            p1.mkdir(parents=True, exist_ok=True)
-            test_metrics_path = str(p1 / f'{metric}.json')
-            evaluate_individual_metrics(results_path=test_metrics_path),
+    load_x = dataset.load_image
+    load_y = dataset.load_segm
+    sdice_metric = lambda x, y, i: sdice(get_pred(x), get_pred(y), dataset.load_spacing(i), sdice_tolerance)
+    final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
+    evaluate_individual_metrics = partial(
+        evaluate_individual_metrics_probably_with_ids_no_pred,
+        load_y=load_y,
+        load_x=load_x,
+        predict=predict,
+        metrics=final_metrics,
+        test_ids=test_ids
+    )
+    p1 = Path(f'{base_res_dir}/source_{source}_target_{target}/adaBN/best_test_metrics/')
+    p1.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(),p1/'model.pth')
+    evaluate_individual_metrics(results_path=p1,exist_ok=True),
 
 
 def main():
