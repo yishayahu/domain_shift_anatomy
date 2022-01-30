@@ -127,9 +127,8 @@ def run_adaBN(source, target, device, base_res_dir, base_split_dir, metric,msm):
     p1 = Path(f'{base_res_dir}/source_{source}_target_{target}/adaBN/best_test_metrics/')
     p2 = Path(f'{base_res_dir}/source_{source}_target_{target}/adaBN/test_metrics/')
     p1.mkdir(parents=True, exist_ok=True)
-    p2.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(),f'{base_res_dir}/source_{source}_target_{target}/adaBN/model.pth')
-    evaluate_individual_metrics(results_path=p1,exist_ok=True),
+    evaluate_individual_metrics(results_path=p1,exist_ok=True)
     shutil.copytree(p1,p2)
 
 
