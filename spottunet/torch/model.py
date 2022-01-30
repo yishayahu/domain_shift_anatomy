@@ -372,9 +372,12 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     if f'target_{src_cluster}' not in vizviz:
                         vizviz[f'target_{src_cluster}'] = []
                     vizviz[f'target_{src_cluster}'].append(None)
-                    img = tensor_to_image(img)
                     im_path =  f'target_{src_cluster}_{train_step_logger._experiment.step}_{len(vizviz[f"target_{src_cluster}"])}.png'
-                    img.save(im_path)
+                    if img.shape[0] == 3:
+                        plt.imsave(im_path,  np.array(img[1]), cmap='gray'  )
+                    else:
+                        img = tensor_to_image(img)
+                        img.save(im_path)
                     log_log[f'{src_cluster}/target_{len(vizviz[f"target_{src_cluster}"])}'] = wandb.Image(im_path)
 
         else:
@@ -385,9 +388,12 @@ def train_step_unsup(*inputs, architecture, criterion, optimizer, n_targets=1, l
                     if f'source_{src_cluster}' not in vizviz:
                         vizviz[f'source_{src_cluster}'] = []
                     vizviz[f'source_{src_cluster}'].append(None)
-                    img = tensor_to_image(img)
                     im_path =  f'source_{src_cluster}_{train_step_logger._experiment.step}_{len(vizviz[f"source_{src_cluster}"])}.png'
-                    img.save(im_path)
+                    if img.shape[0] == 3:
+                        plt.imsave(im_path,  np.array(img[1]), cmap='gray'  )
+                    else:
+                        img = tensor_to_image(img)
+                        img.save(im_path)
                     log_log[f'{src_cluster}/source_{len(vizviz[f"source_{src_cluster}"])}'] = wandb.Image(im_path)
     if accumulate_for_loss is not None:
         use_dist_loss = False

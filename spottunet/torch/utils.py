@@ -182,6 +182,5 @@ def tensor_to_image(tensor):
     if tensor.shape[0] == 1:
         tensor = tensor.squeeze()
     else:
-        assert tensor.shape[0] == 3
-        tensor= tensor.transpose((1,2,0))
+        assert False
     return PIL.Image.fromarray(tensor)
