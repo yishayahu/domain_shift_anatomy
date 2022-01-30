@@ -49,10 +49,12 @@ def run_adaBN(source, target, device, base_res_dir, base_split_dir, metric,msm):
     data_path = DATA_PATH if not msm else MSM_DATA_PATH
     # define and load model
     n_chans_in = 1
+    src_ckpt_path = f'{base_split_dir}/site_{source}/model_sgd.pth'
     if msm:
         n_chans_in = 3
+        src_ckpt_path = f'{base_split_dir}/site_{source}/model_adam.pth'
     model = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16).to(device)
-    src_ckpt_path = f'{base_split_dir}/site_{source}/model_sgd.pth'
+
     load_model_state(model, src_ckpt_path)
     for m in model.modules():
         if isinstance(m, nn.BatchNorm2d):
