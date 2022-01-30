@@ -156,8 +156,8 @@ class ComputeMetricsMsm:
     def val_metrices(self):
         return self.compute('val',filter_sparse_tagging=True)
 
-    def test_metrices(self,results_path,best=''):
-        os.makedirs(results_path, exist_ok=False)
+    def test_metrices(self,results_path,exist_ok=False,best=''):
+        os.makedirs(results_path, exist_ok=exist_ok)
         if not self.mask_labeled_amount:
             self.val_metrices()
         results = self.compute('test',filter_sparse_tagging=True)
