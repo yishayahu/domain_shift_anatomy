@@ -1,5 +1,5 @@
-NUM_EPOCHS: 30
-BATCHES_PER_EPOCH: 1000
+NUM_EPOCHS: 15
+BATCHES_PER_EPOCH: 2000
 ADD_SOURCE_IDS: True
 ACCUMULATE: True
 FREEZE_FUNC:
@@ -7,15 +7,17 @@ FREEZE_FUNC:
   exclude_layers: [ 'init_path', 'down','bottleneck' ]
 UNSUP: True
 LR_INIT: 0.0001
-TRAIN_FUNC:
-  FUNC: train_unsup
-  n_clusters: 9
-  accumulate: True
+
 TRAIN_STEP_FUNC:
   FUNC: train_step_unsup
   target_domain: target
   dist_loss_lambda: 0.1
 SECOND_ROUND:
+  TRAIN_FUNC:
+    FUNC: train_unsup
+    n_clusters: 9
+    accumulate: True
+    id_to_num_slices: id_to_num_slices
   CRITERION:
     FUNC: weighted_cross_entropy_with_logits
     reduce:

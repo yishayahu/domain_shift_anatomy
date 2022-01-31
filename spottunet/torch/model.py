@@ -8,6 +8,7 @@ import matplotlib
 import numpy as np
 import torch
 import wandb
+from dpipe.io import load
 from dpipe.train import Checkpoints, Logger, Policy, EarlyStopping, ValuePolicy
 from dpipe.train.base import _DummyCheckpoints, _DummyLogger, _build_context_manager
 from matplotlib import pyplot as plt
@@ -109,7 +110,7 @@ def get_best_match(sc, tc):
     return best_match
 
 def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.inf, logger: Logger = None,
-          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14,accumulate=False,load_by_cluster_id=False, **kwargs):
+          checkpoints: Checkpoints = None, validate: Callable = None,n_clusters=14,accumulate=False,load_by_cluster_id=False,id_to_num_slices='', **kwargs):
     """
     Performs a series of train and validation steps.
 
@@ -145,6 +146,8 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
         id_getter = kwargs.pop('id_getter')
         slc_getter = kwargs.pop('slc_getter')
         slc_getter.cluster_id_loader = id_getter
+    if id_to_num_slices:
+        id_to_num_slices = load(id_to_num_slices)
     if checkpoints is None:
         checkpoints = _DummyCheckpoints()
     if logger is None:
@@ -205,17 +208,31 @@ def train_unsup(train_step: Callable, batch_iter: Callable, n_epochs: int = np.i
                     target_clusters.append([])
                 p = PCA(n_components=20,random_state=42)
                 t = TSNE(n_components=2,learning_rate='auto',init='pca',random_state=42)
-                points = np.stack(list(slice_to_feature_source.values()) + list(slice_to_feature_target.values()))
+                points = []
+                slices = []
+                for id_slc,feat in slice_to_feature_source.items():
+                    points.append(feat)
+                    id1, slc_num = id_slc.split('_')
+                    slc_num = int(slc_num) / id_to_num_slices[id1]
+                    slices.append(slc_num)
+                for id_slc,feat in slice_to_feature_target.items():
+                    points.append(feat)
+                    id1, slc_num = id_slc.split('_')
+                    slc_num = int(slc_num)/ id_to_num_slices[id1]
+                    slices.append(slc_num)
+                points = np.array(points)
                 points = points.reshape(points.shape[0],-1)
                 print('doing tsne')
                 points = p.fit_transform(points)
+                slices = np.expand_dims(np.array(slices),axis=1)
+                points = np.concatenate([points,slices],axis=1)
                 points = t.fit_transform(points)
                 source_points,target_points = points[:len(slice_to_feature_source)],points[len(slice_to_feature_source):]
                 # source_points,target_points = points[:max(len(slice_to_feature_source),n_clusters)],points[-max(len(slice_to_feature_target),n_clusters):]
                 k1 = KMeans(n_clusters=n_clusters,random_state=42)
                 print('doing kmean 1')
                 sc = k1.fit_predict(source_points)
-                k2 = KMeans(n_clusters=n_clusters,random_state=42)
+                k2 = KMeans(n_clusters=n_clusters,random_state=42,init=k1.cluster_centers_)
                 print('doing kmean 2')
                 tc = k2.fit_predict(target_points)
                 print('getting best match')

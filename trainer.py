@@ -106,6 +106,7 @@ if __name__ == '__main__':
 
     base_res_dir = st_res_dir if not msm else msm_res_dir
     base_split_dir = st_splits_dir if not msm else msm_splits_dir
+    id_to_num_slices = idToNumSlices if not msm else idToNumSlicesMsm
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
     if opts.train_only_source:

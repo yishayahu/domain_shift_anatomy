@@ -15,7 +15,8 @@ BASELINE_PATH = choose_root(
 )
 
 
-
+idToNumSlices =choose_root('/home/dsi/shaya/id_to_num_slices.json')
+idToNumSlicesMsm =choose_root('/home/dsi/shaya/id_to_num_slices_msm.json')
 msm_res_dir = choose_root('/home/dsi/shaya/unsup_results_msm/')
 msm_splits_dir = choose_root('/home/dsi/shaya/unsup_splits_msm/')
 

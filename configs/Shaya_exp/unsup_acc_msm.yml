@@ -11,15 +11,17 @@ OPTIMIZER:
   lr: 0.00001
 CKPT_NAME: "model_adam"
 MSM: True
-TRAIN_FUNC:
-  FUNC: train_unsup
-  n_clusters: 9
-  accumulate: True
+
 TRAIN_STEP_FUNC:
   FUNC: train_step_unsup
   target_domain: target
   dist_loss_lambda: 0.1
 SECOND_ROUND:
+  TRAIN_FUNC:
+    FUNC: train_unsup
+    n_clusters: 9
+    accumulate: True
+    id_to_num_slices: id_to_num_slices
   CRITERION:
     FUNC: weighted_cross_entropy_with_logits
     reduce:
