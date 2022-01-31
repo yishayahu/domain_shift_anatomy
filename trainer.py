@@ -179,6 +179,7 @@ if __name__ == '__main__':
         if len(train_ids) > 2:
             train_ids = train_ids[-4:]
         val_ids = val_ids[:2]
+        ids_sampling_weights = None
     else:
         os.environ['debug']  = 'False'
         lock_dir(exp_dir)
