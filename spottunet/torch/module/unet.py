@@ -68,13 +68,13 @@ class UNet2D(nn.Module):
         x1 = self.down1(x0)
         x2 = self.down2(x1)
 
-        b0 = x2
+        b_bottle = x2
         b0 = self.bottleneck(x2)
         x2_up = self.up2(b0 + self.shortcut2(x2))
         x1_up = self.up1(x2_up + self.shortcut1(x1))
         x_out = self.out_path(x1_up + self.shortcut0(x0))
         if self.get_bottleneck:
-            bb = b0
+            bb = b_bottle
             for l in self.bottleneck[:-2]:
 
                 bb = l(bb)
