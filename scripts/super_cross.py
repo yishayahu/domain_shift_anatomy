@@ -168,6 +168,7 @@ def main():
     #     run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[1,2,4])
     experiments = ['adaBN']
     combs = list(itertools.permutations(range(6), 2))
+    combs = [(0, 4), (3, 1), (2, 5), (2, 3)]
     random.shuffle(combs)
     metric = 'sdice_score'
     run_cross_validation(only_stats=False, experiments=experiments, combs=combs, metric=metric,do_msm=False)
