@@ -50,7 +50,7 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
     with tempfile.NamedTemporaryFile() as out_file, tempfile.NamedTemporaryFile() as err_file:
         try:
-            cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --bs {bs} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}'
+            cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --batch_size {bs} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd,shell=True,check=True,capture_output=True)
             sdice = json.load(open(sdice_path))
@@ -105,7 +105,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric,targ
                     pp_model = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_{last_ckpt}/model.pth'
                     if not os.path.exists(pp_model):
                         my_devices.append(curr_device)
-                        subprocess.run(f'python trainer.py --config only_source{msm}_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source --bs {bs} >  errs_and_outs/only_source{source}_logs_out.txt 2> errs_and_outs/only_source{source}_logs_err.txt',shell=True,check=True)
+                        subprocess.run(f'python trainer.py --config only_source{msm}_{adam_or_sgd} --exp_name only_source_{adam_or_sgd} --device {curr_device} --source {source} --train_only_source --batch_size {bs} >  errs_and_outs/only_source{source}_logs_out.txt 2> errs_and_outs/only_source{source}_logs_err.txt',shell=True,check=True)
                         my_devices.remove(curr_device)
                     os.rename(pp_model,src_ckpt_path)
                     pp_optim = f'{res_path}/source_{source}/only_source_{adam_or_sgd}/checkpoints/checkpoint_{last_ckpt}/optimizer.pth'
