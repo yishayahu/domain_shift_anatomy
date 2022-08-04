@@ -102,6 +102,7 @@ if __name__ == '__main__':
     else:
         base_res_dir = st_res_dir
         base_split_dir = st_splits_dir
+    base_res_dir = Path(str(base_res_dir)+ f'_bs_{opts.batch_size}')
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
     if opts.train_only_source:
