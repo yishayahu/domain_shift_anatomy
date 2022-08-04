@@ -1,4 +1,0 @@
-NUM_EPOCHS: 60
-SOFT: True
-SPOT: True
-FREEZE_FUNC: "freeze_model_spottune"

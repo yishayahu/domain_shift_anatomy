@@ -1,9 +1,0 @@
-FREEZE_FUNC: "none_func"
-NUM_EPOCHS: 60
-SECOND_ROUND:
-  CRITERION:
-    FUNC: FineRegularizedLoss
-    architecture: architecture
-    reference_architecture: reference_architecture
-    as_class: True
-

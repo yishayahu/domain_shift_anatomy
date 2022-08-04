@@ -168,7 +168,7 @@ if __name__ == '__main__':
     else:
         lock_dir(exp_dir)
 
-
+    print(f'running on bs {batch_size}')
     print(f'running {opts.exp_name}')
     fix_seed(42)
     if not msm:
