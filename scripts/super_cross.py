@@ -181,6 +181,7 @@ def main():
         combs = [(2,4),(1,2),(4,3),(2,5),(0,3)]
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
+        random.shuffle(combs)
         for bs in [2,4,8,16,32,64]:
             res_path  = Path(str(res_path)+ f'_bs_{bs}')
             if not res_path.exists():
