@@ -1,0 +1,11 @@
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+ADD_SOURCE_IDS: True
+OPTIMIZER:
+  FUNC: Adam
+SECOND_ROUND:
+  SAMPLE_FUNC:
+    FUNC: 'load_by_gradual_id'
+    batches_per_epoch: batches_per_epoch
+    batch_size: batch_size
+    keep_source: False

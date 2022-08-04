@@ -1,0 +1,5 @@
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+ALPHA_L2SP: 0.1
+OPTIMIZER:
+  FUNC: Adam

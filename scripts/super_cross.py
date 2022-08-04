@@ -32,7 +32,7 @@ def find_available_device(my_devices,running_now,spottune_and_msm):
                 h = nvmlDeviceGetHandleByIndex(device_num)
                 info = nvmlDeviceGetMemoryInfo(h)
                 gpu_utilize = nvmlDeviceGetUtilizationRates(h)
-                if info.free > wanted_free_mem and gpu_utilize.gpu < 3:
+                if info.free > wanted_free_mem:
                     return f'cuda:{device_num}'
             print(f'looking for device my device is {my_devices}')
             places = [x[0] for x in running_now]
@@ -48,14 +48,17 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
         try:
             cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}'
             print(cmd)
-            subprocess.run(cmd,shell=True,check=True)
+            subprocess.run(cmd,shell=True,check=True,capture_output=True)
             sdice = json.load(open(sdice_path))
             if type(sdice)!= float:
                 sdice = np.mean(list(sdice.values()))
 
             ret_value.value = sdice
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
             print(f'error in exp {exp}_{source}_{target}_{ts}')
+            print(e.returncode)
+            print(e.output)
+            print(f'end error in exp {exp}_{source}_{target}_{ts}')
             shutil.copy(err_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_err.txt')
             shutil.copy(out_file.name,f'errs_and_outs/{exp}_{source}_{target}_{ts}_logs_out.txt')
 

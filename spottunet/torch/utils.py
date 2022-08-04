@@ -22,7 +22,7 @@ def load_model_state_cv3_wise(architecture, baseline_exp_path):
                                             f'experiment_{n_fold * 3 + n_cv_block}', 'model.pth')
     load_model_state(architecture, path=path_to_pretrained_model)
 
-
+from dpipe.torch import load_model_state
 def load_model_state_fold_wise(architecture, baseline_exp_path,modify_state_fn=None):
     load_model_state(architecture, path=baseline_exp_path, modify_state_fn=modify_state_fn)
 
@@ -85,7 +85,7 @@ def unfreeze_model(model):
 
 
 def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
-                       random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2):
+                       random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2,keep_source=True):
     source_ids = ids[:-ts_size]
     target_ids = ids[-ts_size:]
     source_iter = sample(source_ids, weights, random_state)
@@ -94,10 +94,28 @@ def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[floa
     while True:
 
         for _ in range(batches_per_epoch):
-            from_target = min((epoch//4)+ 1,batch_size-1)
+            if keep_source:
+                from_target = min((epoch//4)+ 1,batch_size-1)
+            else:
+                from_target = min((epoch//4)+ 1,batch_size)
             from_source = batch_size - from_target
             for _ in range(from_target):
                 yield squeeze_first(tuple(pam(loaders, next(target_iter))))
             for _ in range(from_source):
                 yield squeeze_first(tuple(pam(loaders, next(source_iter))))
         epoch+=1
+
+def load_half_from_test(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
+                        random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2):
+    train_ids = ids[-ts_size:]
+    test_ids = ids[:-ts_size]
+    train_iter = sample(train_ids, weights, random_state)
+    test_iter = sample(test_ids, weights, random_state)
+
+    while True:
+
+        for _ in range(batches_per_epoch):
+            for _ in range(8):
+                yield squeeze_first(tuple(pam(loaders, next(train_iter))))
+            for _ in range(8):
+                yield squeeze_first(tuple(pam(loaders, next(test_iter))))

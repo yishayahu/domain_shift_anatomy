@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
 
     print(f'running {opts.exp_name}')
-    fix_seed(75)
+    fix_seed(42)
     if not msm:
         voxel_spacing = (1, 0.95, 0.95)
 
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     else:
         dataset = MultiSiteMri(train_ids)
 
-    seed = 0xBadCafe
+    seed = 42
 
 
     dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
@@ -194,6 +194,7 @@ if __name__ == '__main__':
     architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
+
     if not opts.train_only_source:
         print(f'loading ckpt from {base_ckpt_path}')
         load_model_state_fold_wise(architecture=architecture, baseline_exp_path=base_ckpt_path,modify_state_fn=None if not spot else modify_state_fn_spottune)
@@ -225,6 +226,7 @@ if __name__ == '__main__':
         reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
+    reference_architecture.to(device)
 
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     if 'load_by_gradual_id' in str(type(sample_func)):
@@ -298,7 +300,8 @@ if __name__ == '__main__':
         lr_policy = None
         architecture_policy = None
         optimizer_policy = None
-        train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger,use_clustering_curriculum=clustering)
+        alpha_l2sp = getattr(cfg,'ALPHA_L2SP',None)
+        train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger,use_clustering_curriculum=clustering,alpha_l2sp=alpha_l2sp)
         if lr:
             train_kwargs['lr'] = lr
 
@@ -373,7 +376,7 @@ if __name__ == '__main__':
             test_ids=test_ids,
             logger=logger
         )
-    fix_seed(seed=0xBAAAAAAD)
+    fix_seed(seed=42)
     freeze_func(architecture)
     if spot:
         run_experiment = run(

@@ -2,38 +2,77 @@ import os
 
 import numpy as np
 
+import torchvision.transforms.functional as TF
 
 import torch
 import torch.backends.cudnn as cudnn
 import SimpleITK as sitk
 from spottunet import paths
 from torch.utils.data import DataLoader
+from torchvision import transforms
+from tqdm import tqdm
+multiSiteMri_int_to_site = {0:'ISBI',1:"ISBI_1.5",2:'I2CVB',3:"UCL",4:"BIDMC",5:"HK" }
+multiSiteMri_site_to_int = {v:k for k,v in multiSiteMri_int_to_site.items()}
+
+
 cudnn.benchmark = True
 
 
 
 class MultiSiteMri(torch.utils.data.Dataset):
-    def __init__(self, ids):
+    def __init__(self, ids,yield_id=False,test=False):
+        self.yield_id  = yield_id
+        self.test = test
+        self.random_patch = False
+        self.patch_size = None
+
         self.patches_Allimages, self.patches_Allmasks = self.create_datalists(ids)
 
     def load_image(self,id1):
         return self.patches_Allimages[id1[0]]
     def load_segm(self,id1):
         return self.patches_Allmasks[id1[0]]
+    def load_domain_label_number(self,id1):
+        id1 = id1[0]
+        sup = id1.split('/')[0]
+        return multiSiteMri_site_to_int[sup]
+
+    def load_id(self,id1):
+
+        return int(str(self.load_domain_label_number(id1)) + id1[0][-6:-4])
+
     def __getitem__(self, idx):
-        raise NotImplementedError()
+
+        for (i,id1),(next_i,_) in zip(self.i_to_id,self.i_to_id[1:]+[(self.len_ds,None)]):
+            if i <= idx < next_i:
+                img,seg = self.patches_Allimages[id1[0]],self.patches_Allmasks[id1[0]]
+                slc_num = idx-i
+                img_slc = torch.tensor(img[slc_num])
+                seg_slc= torch.tensor(seg[slc_num])
+                if self.random_patch:
+                    x1, x2, x3, x4 = transforms.RandomCrop.get_params(
+                        img_slc, output_size=self.patch_size)
+                    img_slc = TF.crop(img_slc, x1, x2, x3, x4)
+                    seg_slc = TF.crop(seg_slc, x1, x2, x3, x4)
+                if self.yield_id:
+                    return img_slc,seg_slc,self.load_id(id1),slc_num
+                return img_slc,seg_slc
 
     def __len__(self):
-        return len(self.patches_Allimages)
+        return self.len_ds
 
 
     def create_datalists(self,ids):
         patches_Allimages= {}
         patches_Allmasks = {}
-        for id1 in ids:
+        self.i_to_id = []
+        self.len_ds = 0
+        for id1 in tqdm(ids,desc='creating dataset MSM'):
+            self.i_to_id.append([self.len_ds,id1])
             patches = self.extract_patch(id1)
             patches_Allimages[id1[0]] = patches[0]
             patches_Allmasks[id1[0]] = patches[1]
+            self.len_ds = self.len_ds + len(patches[0])
         return patches_Allimages, patches_Allmasks
 
 
@@ -48,11 +87,15 @@ class MultiSiteMri(torch.utils.data.Dataset):
         z = []
         min1 = np.min(limZ)
         max1 = np.max(limZ)
-        for i in range(1, mask.shape[2] - 2):
-            if min1 <= i < max1:
+        if self.test:
+            for i in range(1, mask.shape[2] - 2):
                 z.append(i)
-            elif np.random.random()< 0.1:
-                z.append(i)
+        else:
+            for i in range(1, mask.shape[2] - 2):
+                if min1 <= i < max1:
+                    z.append(i)
+                elif np.random.random()< 0.1:
+                    z.append(i)
         num_patches = len(z)
 
 
@@ -64,36 +107,14 @@ class MultiSiteMri(torch.utils.data.Dataset):
             mask_patches.append(mask_patch)
             num_patches_now += 1
         image_patches = np.stack(
-            image_patches)  # make into 4D (batch_size, patch_size[0], patch_size[1], patch_size[2])
-        mask_patches = np.stack(mask_patches)  # make into 4D (batch_size, patch_size[0], patch_size[1], patch_size[2])
+            image_patches)
+        mask_patches = np.stack(mask_patches)
         mask_patches = np.expand_dims(mask_patches,-1)
 
         image_patches = image_patches.transpose([0,3, 1, 2])
         mask_patches = mask_patches.transpose([0,3, 1, 2])
         return image_patches, mask_patches
 
-    # def extract_one_random_patch(self,filename, patch_size, num_classes, num_patches=1):
-    #     """Extracts a patch of given resolution and size at a specific location."""
-    #     #print(filename)
-    #     image, mask = self.parse_fn(filename)  # get the image and its mask
-    #     image_patches = []
-    #     mask_patches = []
-    #     num_patches_now = 0
-    #     patch_wise_image = []
-    #     patch_wise_mask = []
-    #     limX, limY, limZ = np.where(mask > 0)
-    #
-    #     while num_patches_now < num_patches:
-    #         z = self.random_patch_center_z(mask, patch_size=patch_size)  # define the centre of current patch
-    #         # x, y, z = [kk//2 for kk in mask.shape] # only select the centroid location
-    #         image_patch = image[:, :, z - 1:z + 2]
-    #         mask_patch = mask[:, :, z]
-    #
-    #     mask_patch = _label_decomp(mask_patch,num_classes)# make into 5D (batch_size, patch_size[0], patch_size[1], patch_size[2], num_classes)
-    #     # print image_patches.shape
-    #     image_patches = image_patch.transpose([0,3, 1, 2])
-    #     mask_patches = mask_patch.transpose([0,3, 1, 2])
-    #     return image_patches.astype(np.float64), mask_patches.astype(np.float64)
 
     def parse_fn(self,data_path):
         '''

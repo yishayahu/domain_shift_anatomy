@@ -32,59 +32,24 @@ def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_ke
     assert 0 <= n_inputs <= len(inputs)
     inputs = sequence_to_var(*inputs, device=architecture)
     inputs, targets = inputs[:n_inputs], inputs[n_inputs:]
-    loss = criterion(architecture(*inputs), *targets)
-    if use_clustering_curriculum:
-        if type(batch_iter_step.dataset) == DsWrapper:
-            loss = batch_iter_step.dataset.send_loss(loss,batch_iter_step)
-        else:
-            loss = torch.mean(loss)
+    if alpha_l2sp is not None:
+        if reference_architecture is None:
+            raise ValueError('`reference_architecture` should be provided for L2-SP regularization.')
+
+        w_diff = torch.tensor(0., requires_grad=True, dtype=torch.float32)
+        w_diff.to(get_device(architecture))
+        for p1, p2 in zip(architecture.parameters(), reference_architecture.parameters()):
+            w_diff = w_diff + torch.sum((p1 - p2) ** 2)
+        loss = criterion(architecture(*inputs), *targets) + alpha_l2sp * w_diff
+    else:
+        loss = criterion(architecture(*inputs), *targets)
+
     global prev_step
     if train_step_logger is not None and train_step_logger._experiment.step > prev_step and reference_architecture is not None:
         prev_step = train_step_logger._experiment.step
-        dist_pet_layer = []
-        param_size_per_layer = []
-        normalize_dist_per_layer = []
-        dist_pet_layer_bn = []
-        param_size_per_layer_bn = []
-        normalize_dist_per_layer_bn = []
-        names = []
-        names_bn = []
-        for (n1, p1), (n2, p2) in zip(architecture.named_parameters(), reference_architecture.named_parameters()):
-            assert n1 == n2
-            if 'out_path.4' in n1 or 'out_path.3.layer.bias' in n1:
-                continue
-            if 'bn' in n1:
-                dist_pet_layer_bn.append(float(torch.mean(torch.abs(p1.detach().cpu() - p2.cpu()))))
-                param_size_per_layer_bn.append(float(torch.mean(torch.abs(p1))))
-                normalize_dist_per_layer_bn.append(dist_pet_layer[-1] / param_size_per_layer[-1])
-                names_bn.append(n1)
-            else:
-                dist_pet_layer.append(float(torch.mean(torch.abs(p1.detach().cpu() - p2.cpu()))))
-                param_size_per_layer.append(float(torch.mean(torch.abs(p1))))
-                normalize_dist_per_layer.append(dist_pet_layer[-1] / param_size_per_layer[-1])
-                names.append(n1)
-        if False:
-            for k, v in {'dist': dist_pet_layer, 'param_size': param_size_per_layer,
-                         'relative_dist': normalize_dist_per_layer, 'dist_bn': dist_pet_layer_bn,
-                         'param_size_bn': param_size_per_layer_bn, 'relative_dist_bn': normalize_dist_per_layer_bn}.items():
-                im_path = f'{train_step_logger._experiment.name}_{k}.png'
-                if 'bn' in k:
-                    curr_names = names_bn
-                else:
-                    curr_names = names
-                print(f'max for {k} is in layer {curr_names[np.argmax(v)]} and its values is {np.max(v)}')
 
-                plt.plot(list(range(len(v))), v)
-                plt.savefig(im_path)
 
-                log_log = {f'{k}': wandb.Image(im_path)}
-                if len(optimizer.param_groups) > 1 and k == 'dist':
-                    for i in range(len(optimizer.param_groups)):
-                        print(f"lr_group_{i}: {optimizer.param_groups[i]['lr']}")
-                        log_log[f'lr_group_{i}'] = optimizer.param_groups[i]['lr']
-                wandb.log(log_log, step=train_step_logger._experiment.step)
-                plt.cla()
-                plt.clf()
+
 
     if loss_key is not None:
         optimizer_step(optimizer, loss[loss_key], **optimizer_params)

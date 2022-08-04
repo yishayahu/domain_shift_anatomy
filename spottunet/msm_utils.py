@@ -8,8 +8,8 @@ import os
 import numpy as np
 import SimpleITK as sitk
 from scipy import ndimage
-import logging
 from medpy import metric
+import logging
 
 
 def _eval_dice(gt_y, pred_y, detail=False):
