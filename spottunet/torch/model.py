@@ -11,7 +11,6 @@ from dpipe.im.utils import identity, dmap
 from dpipe.torch.utils import *
 from dpipe.torch.model import *
 
-from clustering.ds_wrapper import DsWrapper
 from spottunet.torch.functional import gumbel_softmax
 
 layers = ['init_path.0', 'init_path.1', 'init_path.2', 'init_path.3', 'shortcut0', 'down1.0', 'down1.1', 'down1.2',
