@@ -22,7 +22,7 @@ prev_step = -1
 
 
 def train_step(*inputs, architecture, criterion, optimizer, n_targets=1, loss_key=None,
-               alpha_l2sp=None, reference_architecture=None, train_step_logger=None,use_clustering_curriculum=False,batch_iter_step=None, **optimizer_params):
+               alpha_l2sp=None, reference_architecture=None, train_step_logger=None,batch_iter_step=None, **optimizer_params):
     architecture.train()
     if n_targets >= 0:
         n_inputs = len(inputs) - n_targets

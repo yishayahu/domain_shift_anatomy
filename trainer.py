@@ -19,12 +19,15 @@ from dpipe.torch import save_model_state, load_model_state, inference_step
 
 from clustering.dataloader_wrapper import DataLoaderWrapper
 from clustering.ds_wrapper import DsWrapper
+
+from spottunet.brats2019.dataset import brain3DDataset
 from spottunet.dataset.multiSiteMri import MultiSiteMri, MultiSiteDl, InfiniteLoader
 from spottunet.msm_utils import  ComputeMetricsMsm
 from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
 from spottunet.torch.module.spottune_unet_layerwise import SpottuneUNet2D
+from spottunet.torch.module.unet3d import Unet3D, cross_entropy_dice
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist, \
     PreDefinedFineTunePolicy
@@ -94,11 +97,15 @@ if __name__ == '__main__':
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
+    brats = getattr(cfg,'BRATS',False)
     slice_sampling_interval = 1 if opts.ts_size > 0 else 4
     if msm:
         assert opts.source == opts.target or opts.train_only_source
         base_res_dir = msm_res_dir
         base_split_dir = msm_splits_dir
+    elif brats:
+        base_res_dir = BRATS_RES_DIR
+        base_split_dir = BRATS_SPLITS_PATH
     else:
         base_res_dir = st_res_dir
         base_split_dir = st_splits_dir
@@ -140,7 +147,6 @@ if __name__ == '__main__':
 
     batches_per_epoch = getattr(cfg,'BATCHES_PER_EPOCH',100)
     spot = getattr(cfg,'SPOT',False)
-    clustering = getattr(cfg,'CLUSTERING',False)
 
     optimizer_creator = getattr(cfg,'OPTIMIZER',partial(SGD,momentum=0.9, nesterov=True))
     if optimizer_creator.func == SGD or getattr(cfg,'START_FROM_SGD',False):
@@ -172,13 +178,17 @@ if __name__ == '__main__':
     print(f'running on bs {batch_size}')
     print(f'running {opts.exp_name}')
     fix_seed(42)
-    if not msm:
+    if  msm:
+        dataset = MultiSiteMri(train_ids)
+
+    elif brats:
+        dataset = brain3DDataset(train_ids)
+    else:
         voxel_spacing = (1, 0.95, 0.95)
 
         preprocessed_dataset = apply(Rescale3D(CC359(data_path), voxel_spacing), load_image=scale_mri)
         dataset = apply(cache_methods(apply(preprocessed_dataset, load_image=np.float16)), load_image=np.float32)
-    else:
-        dataset = MultiSiteMri(train_ids)
+
 
     seed = 42
 
@@ -192,7 +202,10 @@ if __name__ == '__main__':
     n_chans_in = 1
     if msm:
         n_chans_in = 3
-    architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
+    if brats:
+        architecture = Unet3D()
+    else:
+        architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
 
     architecture.to(device)
 
@@ -224,20 +237,28 @@ if __name__ == '__main__':
     if spot or opts.train_only_source:
         reference_architecture = None
     else:
-        reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
+        if brats:
+            reference_architecture = Unet3D()
+            reference_architecture = reference_architecture.to(device)
+        else:
+            reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
+            reference_architecture= reference_architecture.to(device)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     cfg.second_round()
-    reference_architecture.to(device)
+
 
     sample_func = getattr(cfg,'SAMPLE_FUNC',load_by_random_id)
     if 'load_by_gradual_id' in str(type(sample_func)):
         sample_func = partial(sample_func,ts_size=opts.ts_size if opts.ts_size != 0 else 1)
     training_policy = getattr(cfg,'TRAINING_POLICY',DummyPolicy())
+
     criterion = getattr(cfg,'CRITERION',weighted_cross_entropy_with_logits)
 
     if msm:
         metric_to_use = 'dice'
         msm_metrics_computer = ComputeMetricsMsm(val_ids=val_ids,test_ids=test_ids,logger=logger)
+    elif brats:
+        metric_to_use = 'dice'
     else:
         metric_to_use = 'sdice_score'
 
@@ -246,8 +267,14 @@ if __name__ == '__main__':
         architecture_policy.to(device)
         temperature = 0.1
         use_gumbel_inference = False
-
-        if not msm:
+        if brats:
+            def predict(image):
+                return inference_step_spottune(image, architecture_main=architecture, architecture_policy=architecture_policy,
+                                               activation=torch.sigmoid, temperature=temperature, use_gumbel=use_gumbel_inference,soft=cfg.SOFT)
+            validate_step = partial(compute_metrics_probably_with_ids_spottune, predict=predict,
+                                    load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics,
+                                    architecture_main=architecture)
+        elif not msm:
             @slicewise  # 3D -> 2D iteratively
             @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
             @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
@@ -283,8 +310,12 @@ if __name__ == '__main__':
         train_step_func = train_step_spottune
 
     else:
-
-        if not msm:
+        if brats:
+            def predict(image):
+                return inference_step(image, architecture=architecture, activation=torch.sigmoid)
+            validate_step = partial(compute_metrics_probably_with_ids if opts.exp_name != 'debug' else empty_dict_func, predict=predict,
+                                    load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
+        elif not msm:
             @slicewise  # 3D -> 2D iteratively
             @add_extract_dims(2)  # 2D -> (4D -> predict -> 4D) -> 2D
             @divisible_shape(divisor=[8] * 2, padding_values=np.min, axis=SPATIAL_DIMS[1:])
@@ -302,7 +333,7 @@ if __name__ == '__main__':
         architecture_policy = None
         optimizer_policy = None
         alpha_l2sp = getattr(cfg,'ALPHA_L2SP',None)
-        train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger,use_clustering_curriculum=clustering,alpha_l2sp=alpha_l2sp)
+        train_kwargs = dict(architecture=architecture, optimizer=optimizer, criterion=criterion, reference_architecture=reference_architecture,train_step_logger=logger,alpha_l2sp=alpha_l2sp)
         if lr:
             train_kwargs['lr'] = lr
 
@@ -322,23 +353,18 @@ if __name__ == '__main__':
 
 
     x_patch_size = y_patch_size = np.array([256, 256])
-    if clustering:
-        split_source = getattr(cfg,'SPLIT_SOURCE',False)
-        train_dataset = DsWrapper(model=architecture,ids=train_ids,ds=dataset, dataset_creator=CC359Ds,
-                                  n_clusters=cfg.N_CLUSTERS, feature_layer_name='bottleneck.3',
-                                  warmups=cfg.WARMUPS,exp_name=opts.exp_name,decrease_center=cfg.DECREASE_CENTER,
-                                  patch_func=get_random_patch_2d,exp_dir=exp_dir,source_domain=opts.source,
-                                  target_domain=opts.target,split_source=split_source,no_loss=getattr(cfg,'NO_LOSS',False))
-        data_loader_func = DataLoaderWrapper(torch.utils.data.DataLoader).recreate
-        batch_iter = data_loader_func(
-            dataset =train_dataset, batch_size=batch_size,
-            num_workers=0, pin_memory=True, sampler=train_dataset.current_sampler)
-        train_kwargs['batch_iter_step'] = batch_iter
-    elif msm:
+    if msm:
         batch_iter = Infinite(
             sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
                         weights=ids_sampling_weights, random_state=seed),
             unpack_args(get_random_slice, interval=slice_sampling_interval,msm=True),
+            multiply(np.float32),
+            batch_size=batch_size, batches_per_epoch=batches_per_epoch
+        )
+    elif brats:
+        batch_iter = Infinite(
+            sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
+                        weights=ids_sampling_weights, random_state=seed),
             multiply(np.float32),
             batch_size=batch_size, batches_per_epoch=batches_per_epoch
         )

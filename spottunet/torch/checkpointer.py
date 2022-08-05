@@ -17,11 +17,11 @@ class CheckpointsWithBest(Checkpoints):
         current_folder = self._get_checkpoint_folder(iteration)
         current_folder.mkdir(parents=True)
         self._save_to(current_folder)
-        if metrics[self.metric_to_use] > self.best_so_far:
+        if True:#metrics[self.metric_to_use] > self.best_so_far:
             best_folder = self._get_best_checkpoint_folder()
             best_folder.mkdir(parents=True,exist_ok=True)
             self._save_to(best_folder)
-            self.best_so_far = metrics[self.metric_to_use]
+            # self.best_so_far = metrics[self.metric_to_use]
         if iteration:
             self._clear_checkpoint(iteration - 1)
 
