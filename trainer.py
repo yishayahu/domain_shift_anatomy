@@ -17,8 +17,6 @@ from dpipe.train import train, Checkpoints, Policy
 from dpipe.train.logging import TBLogger, ConsoleLogger, WANDBLogger
 from dpipe.torch import save_model_state, load_model_state, inference_step
 
-from clustering.dataloader_wrapper import DataLoaderWrapper
-from clustering.ds_wrapper import DsWrapper
 
 from spottunet.brats2019.dataset import brain3DDataset
 from spottunet.dataset.multiSiteMri import MultiSiteMri, MultiSiteDl, InfiniteLoader
