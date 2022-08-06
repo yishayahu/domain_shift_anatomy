@@ -91,7 +91,7 @@ if __name__ == '__main__':
     cli.add_argument("--ts_size", default=2,type=int)
     cli.add_argument("--train_only_source", action='store_true')
     cli.add_argument("--batch_size", default=None,type=int)
-    cli.add_argument("--momentum", default=None,type=int)
+    cli.add_argument("--momentum", default=None,type=float)
     cli.add_argument("--from_step", default=None,type=int)
     opts = cli.parse_args()
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
