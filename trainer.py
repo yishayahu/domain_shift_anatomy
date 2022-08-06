@@ -323,7 +323,7 @@ if __name__ == '__main__':
     else:
         if brats:
             def predict(image):
-                return inference_step(image, architecture=architecture, activation=torch.sigmoid)
+                return inference_step(image.unsqueeze(0), architecture=architecture, activation=torch.sigmoid)
             validate_step = partial(compute_metrics_probably_with_ids, predict=predict,
                                     load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
         elif not msm:
