@@ -52,12 +52,12 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
         try:
             cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source}  --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} '
             if bs:
-                cmd+= f'--batch_size {bs}'
+                cmd+= f'--batch_size {bs} '
             if momentum:
-                cmd += f'--momentum {momentum}'
+                cmd += f'--momentum {momentum} '
             if from_step:
-                cmd += f'--from_step {from_step}'
-            cmd+= f'>  {out_file.name} 2> {err_file.name}'
+                cmd += f'--from_step {from_step} '
+            cmd+= f' >  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd,shell=True,check=True,capture_output=True)
             sdice = json.load(open(sdice_path))
