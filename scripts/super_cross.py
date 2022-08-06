@@ -57,7 +57,7 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
                 cmd += f'--momentum {momentum}'
             if from_step:
                 cmd += f'--from_step {from_step}'
-            cmd+= '>  {out_file.name} 2> {err_file.name}'
+            cmd+= f'>  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd,shell=True,check=True,capture_output=True)
             sdice = json.load(open(sdice_path))
