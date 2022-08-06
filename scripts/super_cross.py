@@ -45,12 +45,19 @@ def find_available_device(my_devices,running_now,spottune_and_msm):
     else:
         return 'cpu'
 
-def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,res_path,data_split_path,bs):
+def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,res_path,data_split_path,bs,momentum,from_step):
     my_devices.append(device)
     print(f'training on source {source} target {target} exp {exp} on device {device} my devices is {my_devices}')
     with tempfile.NamedTemporaryFile() as out_file, tempfile.NamedTemporaryFile() as err_file:
         try:
-            cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source} --batch_size {bs} --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} >  {out_file.name} 2> {err_file.name}'
+            cmd = f'CUDA_VISIBLE_DEVICES={int(device.split(":")[1])} python trainer.py --config {exp} --exp_name {exp} --device cuda:0 --source {source}  --target {target} --ts_size {ts} --base_split_dir {data_split_path} --base_res_dir {res_path} '
+            if bs:
+                cmd+= f'--batch_size {bs}'
+            if momentum:
+                cmd += f'--momentum {momentum}'
+            if from_step:
+                cmd += f'--from_step {from_step}'
+            cmd+= '>  {out_file.name} 2> {err_file.name}'
             print(cmd)
             subprocess.run(cmd,shell=True,check=True,capture_output=True)
             sdice = json.load(open(sdice_path))
@@ -68,7 +75,7 @@ def run_single_exp(exp,device,source,target,ts,sdice_path,my_devices,ret_value,r
 
 
     my_devices.remove(device)
-def run_cross_validation(experiments, combs,data_split_path,res_path,metric,target_sizes, only_stats=False,bs=None):
+def run_cross_validation(experiments, combs,data_split_path,res_path,metric,target_sizes, only_stats=False,bs=None,momentum=None,from_step=None):
     assert bs is not None
     if torch.cuda.is_available():
         nvmlInit()
@@ -123,7 +130,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric,targ
                         shutil.rmtree(exp_dir_path,ignore_errors=True)
                     print(f'lunch on source {source} target {target} exp {exp}')
                     ret_value = multiprocessing.Value("d", 0.0, lock=False)
-                    p = Process(target=run_single_exp,args=(exp,curr_device,source,target,ts,sdice_path,my_devices,ret_value,res_path,data_split_path,bs))
+                    p = Process(target=run_single_exp,args=(exp,curr_device,source,target,ts,sdice_path,my_devices,ret_value,res_path,data_split_path,bs,momentum,from_step))
                     running_now.append([(exp,ts,f's_{source} t_{target}'),p,ret_value])
                     p.start()
                     time.sleep(5)
@@ -169,10 +176,7 @@ def main():
     if opts.st:
         # base_exps_sgd = ['posttrain','spottune','posttrain_continue_optimizer','gradual_tl','unfreeze_first']
         # base_exps_adam = ['posttrain_adam', 'spottune_adam', 'gradual_tl_adam','posttrain_continue_optimizer_from_step_adam','gradual_tl__continue_optimzer_adam_from_step','unfreeze_first_adam']
-        base_exps_sgd = ['gradual_tl_not_keep_source']
-        base_exps_adam = ['gradual_tl_not_keep_source_adam']
-        experiments_base = base_exps_sgd+base_exps_adam
-        experiments =  experiments_base
+
         if opts.dsi:
             experiments = [x for x in experiments if 'spottune' not in x]
         combs = list(itertools.permutations(range(6),2))
@@ -182,11 +186,29 @@ def main():
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
         random.shuffle(combs)
-        for bs in [2,4,8,16,32,64]:
-            res_path  = Path(str(res_path)+ f'_bs_{bs}')
-            if not res_path.exists():
-                res_path.mkdir()
-            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=res_path,target_sizes=[0,1,2,4],bs=bs)
+        experiments = ['posttrain_continue_optimizer']
+        for momentum in [0.1,0.4,0.8,0.9,0.99]:
+            cur_res_path  = Path(str(res_path)+ f'_momentum_{momentum}')
+            if not cur_res_path.exists():
+                cur_res_path.mkdir()
+            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],momentum=momentum)
+        experiments = ['posttrain_continue_optimizer_from_step_adam']
+        for from_step in [100,500,2000,3000]:
+            cur_res_path  = Path(str(res_path)+ f'_from_step_{from_step}')
+            if not cur_res_path.exists():
+                cur_res_path.mkdir()
+            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],from_step=from_step)
+        base_exps_sgd = ['gradual_tl_not_keep_source']
+        base_exps_adam = ['gradual_tl_not_keep_source_adam']
+        experiments_base = base_exps_sgd+base_exps_adam
+        experiments =  experiments_base
+        for bs in [2,4,8,16,32]:
+            cur_res_path  = Path(str(res_path)+ f'_bs_{bs}')
+            if not cur_res_path.exists():
+                cur_res_path.mkdir()
+            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],bs=bs)
+
+
 
 if __name__ == '__main__':
     main()

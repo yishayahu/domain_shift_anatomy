@@ -90,12 +90,15 @@ if __name__ == '__main__':
     cli.add_argument("--base_split_dir", default='/home/dsi/shaya/data_splits/')
     cli.add_argument("--ts_size", default=2,type=int)
     cli.add_argument("--train_only_source", action='store_true')
-    cli.add_argument("--batch_size", default=16,type=int)
+    cli.add_argument("--batch_size", default=None,type=int)
+    cli.add_argument("--momentum", default=None,type=int)
+    cli.add_argument("--from_step", default=None,type=int)
     opts = cli.parse_args()
     cfg_path = f"configs/Shaya_exp/{opts.config}.yml"
     cfg = Config(yaml.safe_load(open(cfg_path,'r')))
     msm = getattr(cfg,'MSM',False)
     brats = getattr(cfg,'BRATS',False)
+
     slice_sampling_interval = 1 if opts.ts_size > 0 else 4
     if msm:
         assert opts.source == opts.target or opts.train_only_source
@@ -107,7 +110,17 @@ if __name__ == '__main__':
     else:
         base_res_dir = st_res_dir
         base_split_dir = st_splits_dir
-    base_res_dir = Path(str(base_res_dir)+ f'_bs_{opts.batch_size}')
+    if opts.batch_size is None:
+        opts.batch_size = 16
+    else:
+        base_res_dir = Path(str(base_res_dir)+ f'_bs_{opts.batch_size}')
+    if opts.momentum:
+        cfg.OPTIMIZER.keywords['momentum'] = opts.momentum
+        base_res_dir = Path(str(base_res_dir)+ f'_momentum_{opts.momentum}')
+    if opts.from_step:
+        cfg.FROM_STEP = opts.from_step
+        base_res_dir = Path(str(base_res_dir)+ f'_from_step_{opts.from_step}')
+
     device = opts.device if torch.cuda.is_available() else 'cpu'
     ## define paths
     if opts.train_only_source:
@@ -311,7 +324,7 @@ if __name__ == '__main__':
         if brats:
             def predict(image):
                 return inference_step(image, architecture=architecture, activation=torch.sigmoid)
-            validate_step = partial(compute_metrics_probably_with_ids if opts.exp_name != 'debug' else empty_dict_func, predict=predict,
+            validate_step = partial(compute_metrics_probably_with_ids, predict=predict,
                                     load_x=dataset.load_image, load_y=dataset.load_segm, ids=val_ids, metrics=val_metrics)
         elif not msm:
             @slicewise  # 3D -> 2D iteratively
