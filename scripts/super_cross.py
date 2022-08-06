@@ -28,7 +28,7 @@ def find_available_device(my_devices,running_now,spottune_and_msm):
         if spottune_and_msm:
             wanted_free_mem = 30 * 2 ** 30  # at least 30 GB avail
         else:
-            wanted_free_mem = 6 * 2 ** 30  # at least 16 GB avail
+            wanted_free_mem = 16 * 2 ** 30  # at least 16 GB avail
         while True:
             for device_num in range(nvmlDeviceGetCount()):
                 if f'cuda:{device_num}' in my_devices:
@@ -185,6 +185,15 @@ def main():
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
         random.shuffle(combs)
+        base_exps_sgd = ['gradual_tl_not_keep_source']
+        base_exps_adam = ['gradual_tl_not_keep_source_adam']
+        experiments_base = base_exps_sgd+base_exps_adam
+        experiments =  experiments_base
+        for bs in [2,4,8,16,32]:
+            cur_res_path  = Path(str(res_path)+ f'_bs_{bs}')
+            if not cur_res_path.exists():
+                cur_res_path.mkdir()
+            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],bs=bs)
         experiments = ['posttrain_continue_optimizer']
         for momentum in [0.1,0.4,0.8,0.9,0.99]:
             cur_res_path  = Path(str(res_path)+ f'_momentum_{momentum}')
@@ -197,15 +206,7 @@ def main():
             if not cur_res_path.exists():
                 cur_res_path.mkdir()
             run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],from_step=from_step)
-        base_exps_sgd = ['gradual_tl_not_keep_source']
-        base_exps_adam = ['gradual_tl_not_keep_source_adam']
-        experiments_base = base_exps_sgd+base_exps_adam
-        experiments =  experiments_base
-        for bs in [2,4,8,16,32]:
-            cur_res_path  = Path(str(res_path)+ f'_bs_{bs}')
-            if not cur_res_path.exists():
-                cur_res_path.mkdir()
-            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],bs=bs)
+
 
 
 
