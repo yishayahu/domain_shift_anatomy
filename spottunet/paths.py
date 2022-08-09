@@ -10,7 +10,7 @@ MSM_DATA_PATH = choose_root(
     '/home/dsi/shaya/multiSiteMRI/'
 )
 
-BRATS_DATA_PATH = choose_root('/mnt/dsi_vol1/users/gshaya/MICCAI_BraTS_2019_Data_Training/HGG/')
+BRATS_DATA_PATH = choose_root('/dsi/shared/shaya/MICCAI_BraTS_2019_Data_Training/HGG/')
 
 BRATS_SPLITS_PATH = choose_root('/home/dsi/shaya/data_split_brats/')
 BRATS_RES_DIR = choose_root('/home/dsi/shaya/brats_results/')

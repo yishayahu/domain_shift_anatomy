@@ -1,6 +1,7 @@
 import os
 import random
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch
@@ -21,12 +22,12 @@ def fix_seed(seed=0xBadCafe):
     torch.backends.cudnn.benchmark = False
 
 
-def choose_root(*paths: PathLike) -> Path:
+def choose_root(*paths: PathLike) -> Optional[Path]:
     for path in paths:
         path = Path(path)
         if path.exists():
             return path
-    raise FileNotFoundError('No appropriate root found.')
+    return None
 
 
 def sdice(a, b, spacing, tolerance):

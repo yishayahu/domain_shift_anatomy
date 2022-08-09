@@ -1,12 +1,15 @@
 FREEZE_FUNC: "none_func"
 NUM_EPOCHS: 60
 BRATS: True
-CRITERION:
-  FUNC: cross_entropy_dice
 OPTIMIZER:
   FUNC: Adam
   lr: 0.001
   weight_decay: 0.0001
   amsgrad: true
+LR_INIT: 0.001
+
+
+
+
 
 

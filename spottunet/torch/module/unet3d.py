@@ -126,7 +126,7 @@ class Unet3D(nn.Module):
         return y1
 
 
-eps = 0.1
+eps = 0.001
 def dice(output, target):
     num = 2*(output*target).sum() + eps
     den = output.sum() + target.sum() + eps
@@ -136,6 +136,6 @@ def cross_entropy_dice(output, target, weight=1.0):
     output = output.squeeze(1)
     loss = weight * F.binary_cross_entropy_with_logits(output, target)
     output = torch.nn.Sigmoid()(output)
-    loss+= dice(output,target)
+    loss += dice(output,target)
 
     return loss

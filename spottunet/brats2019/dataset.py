@@ -33,13 +33,13 @@ class brain3DDataset(BaseDataset):
             PadIfNecessary(3),
         ]
 
-        self.updateTransformations += [
-            SpatialRotation([(1,2), (1,3), (2,3)], [*[0]*12,1,2,3], auto_update=False), # With a probability of approx. 51% no rotation is performed
-            SpatialFlip(dims=(1,2,3), auto_update=False)
-        ]
+        # self.updateTransformations += [
+        #     SpatialRotation([(1,2), (1,3), (2,3)], [*[0]*12,1,2,3], auto_update=False), # With a probability of approx. 51% no rotation is performed
+        #     SpatialFlip(dims=(1,2,3), auto_update=False)
+        # ]
         # transformations += self.updateTransformations
         self.transform = transforms.Compose(transformations)
-        self.train_transform = transforms.Compose(self.updateTransformations)
+        # self.train_transform = transforms.Compose(self.updateTransformations)
         self.colorJitter = ColorJitter3D((0.3,1.5), (0.3,1.5))
 
 
@@ -68,10 +68,11 @@ class brain3DDataset(BaseDataset):
             t2_img = self.transform(t2_img)
             flair_img = self.transform(flair_img)
             if is_train:
-                t2_img = self.train_transform(t2_img)
-                flair_img = self.train_transform(flair_img)
-                t2_img = self.colorJitter(t2_img)
-                flair_img = self.colorJitter(flair_img, no_update=True)
+                pass
+                # t2_img = self.train_transform(t2_img)
+                # flair_img = self.train_transform(flair_img)
+                # t2_img = self.colorJitter(t2_img)
+                # flair_img = self.colorJitter(flair_img, no_update=True)
             x = torch.concat((t2_img, flair_img), dim=0)
 
         y = nib.load(seg_path)

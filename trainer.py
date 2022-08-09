@@ -183,17 +183,23 @@ if __name__ == '__main__':
         project = 'spot3'
         if len(train_ids) > 2:
             train_ids = train_ids[-4:]
+        if len(test_ids) > 2:
+            test_ids = test_ids[-2:]
+        if len(val_ids) > 2:
+            val_ids = val_ids[-2:]
     else:
         lock_dir(exp_dir)
 
     print(f'running on bs {batch_size}')
     print(f'running {opts.exp_name}')
     fix_seed(42)
+    dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
     if  msm:
         dataset = MultiSiteMri(train_ids)
 
     elif brats:
         dataset = brain3DDataset(train_ids)
+        dice_metric = lambda x, y: dice_score(np.array(get_pred(x),dtype=bool), np.array(get_pred(y).squeeze(),dtype=bool))
     else:
         voxel_spacing = (1, 0.95, 0.95)
 
@@ -204,7 +210,7 @@ if __name__ == '__main__':
     seed = 42
 
 
-    dice_metric = lambda x, y: dice_score(get_pred(x), get_pred(y))
+
     sdice_tolerance = 1
 
     sdice_metric = lambda x, y, i: sdice(get_pred(x), get_pred(y), dataset.load_spacing(i), sdice_tolerance)
@@ -215,6 +221,8 @@ if __name__ == '__main__':
         n_chans_in = 3
     if brats:
         architecture = Unet3D()
+
+        val_metrics.pop('sdice_score')
     else:
         architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
 
@@ -405,6 +413,8 @@ if __name__ == '__main__':
         evaluate_individual_metrics = partial(msm_metrics_computer.test_metrices)
     else:
         final_metrics = {'dice_score': dice_metric, 'sdice_score': sdice_metric}
+        if brats:
+            final_metrics.pop('sdice_score')
         evaluate_individual_metrics = partial(
             evaluate_individual_metrics_probably_with_ids_no_pred,
             load_y=dataset.load_segm,
