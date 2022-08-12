@@ -25,7 +25,12 @@ from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
 from spottunet.torch.module.spottune_unet_layerwise import SpottuneUNet2D
-from spottunet.torch.module.unet3d import Unet3D, cross_entropy_dice
+from spottunet.torch.module.unet3dv2.unet_model import UNet3dv2 as Unet3D
+
+
+# from spottunet.torch.module.unet3d import Unet3D
+from spottunet.torch.module.unet3d import cross_entropy_dice
+from spottunet.torch.module.unet3dv2.utils import load_state_dict
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist, \
     PreDefinedFineTunePolicy
@@ -222,6 +227,11 @@ if __name__ == '__main__':
     if brats:
         architecture = Unet3D()
 
+        if opts.train_only_source:
+            state_dict = torch.load("/home/dsi/shaya/brats2020_176x224x144_v1.h5", map_location=torch.device('cpu'))
+            architecture = load_state_dict(architecture, state_dict,1)
+        architecture = torch.nn.DataParallel(architecture, device_ids=[4, 2, 3,7])
+
         val_metrics.pop('sdice_score')
     else:
         architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
@@ -248,7 +258,7 @@ if __name__ == '__main__':
         from_step = int(getattr(cfg,'FROM_STEP',0))
         if from_step > 0:
             for param in optimizer.param_groups[0]['params']:
-                optimizer.state[param]['step'] = from_step
+                optimizer.state[param]['step'] = torch.tensor(from_step)
     lr = getattr(cfg,'SCHDULER',Schedule(initial=lr_init, epoch2value_multiplier={45: 0.1, }))
     if type(lr) == partial:
         lr = lr()
