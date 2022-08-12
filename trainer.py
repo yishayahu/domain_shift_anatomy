@@ -25,12 +25,7 @@ from spottunet.torch.module.agent_net import resnet
 
 from spottunet.torch.checkpointer import CheckpointsWithBest
 from spottunet.torch.module.spottune_unet_layerwise import SpottuneUNet2D
-from spottunet.torch.module.unet3dv2.unet_model import UNet3dv2 as Unet3D
-
-
-# from spottunet.torch.module.unet3d import Unet3D
-from spottunet.torch.module.unet3d import cross_entropy_dice
-from spottunet.torch.module.unet3dv2.utils import load_state_dict
+from spottunet.torch.module.unet3d import Unet3D, cross_entropy_dice
 from spottunet.torch.schedulers import CyclicScheduler, DecreasingOnPlateauOfVal
 from spottunet.torch.fine_tune_policy import FineTunePolicy, DummyPolicy, FineTunePolicyUsingDist, \
     PreDefinedFineTunePolicy
@@ -226,11 +221,6 @@ if __name__ == '__main__':
         n_chans_in = 3
     if brats:
         architecture = Unet3D()
-
-        if opts.train_only_source:
-            state_dict = torch.load("/home/dsi/shaya/brats2020_176x224x144_v1.h5", map_location=torch.device('cpu'))
-            architecture = load_state_dict(architecture, state_dict,1)
-        architecture = torch.nn.DataParallel(architecture, device_ids=[4, 2, 3,7])
 
         val_metrics.pop('sdice_score')
     else:
