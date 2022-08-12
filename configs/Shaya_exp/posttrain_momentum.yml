@@ -1,0 +1,5 @@
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+OPTIMIZER:
+  FUNC: SGD
+  momentum: 0.99

@@ -185,8 +185,8 @@ def main():
         metric = 'sdice_score'
         data_split_path,res_path = paths.st_splits_dir,paths.st_res_dir
         random.shuffle(combs)
-        base_exps_sgd = ['gradual_tl_not_keep_source']
-        base_exps_adam = ['gradual_tl_not_keep_source_adam']
+        base_exps_sgd = ['gradual_tl_not_keep_source','posttrain']
+        base_exps_adam = ['gradual_tl_not_keep_source_adam','posttrain_adam']
         experiments_base = base_exps_sgd+base_exps_adam
         experiments =  experiments_base
         only_stats = False
@@ -195,7 +195,7 @@ def main():
             if not cur_res_path.exists():
                 cur_res_path.mkdir()
             run_cross_validation(only_stats=only_stats,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],bs=bs)
-        experiments = ['posttrain_continue_optimizer']
+        experiments = ['posttrain_continue_optimizer','posttrain_momentum']
         for momentum in [0.1,0.4,0.8,0.9,0.99]:
             cur_res_path  = Path(str(res_path)+ f'_momentum_{momentum}')
             if not cur_res_path.exists():
