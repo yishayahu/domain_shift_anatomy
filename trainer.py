@@ -221,7 +221,7 @@ if __name__ == '__main__':
         n_chans_in = 3
     if brats:
         architecture = Unet3D()
-
+        architecture = torch.nn.DataParallel(architecture,device_ids=[0,2,3,1])
         val_metrics.pop('sdice_score')
     else:
         architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16) if not spot else SpottuneUNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)

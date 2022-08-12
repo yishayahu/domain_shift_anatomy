@@ -1,0 +1,27 @@
+FREEZE_FUNC: "none_func"
+NUM_EPOCHS: 60
+ADD_SOURCE_IDS: True
+BRATS: True
+  CRITERION:
+    FUNC: cross_entropy_dice
+OPTIMIZER:
+  FUNC: Adam
+  lr: 0.001
+  weight_decay: 0.0001
+  amsgrad: true
+SECOND_ROUND:
+  SAMPLE_FUNC:
+    FUNC: 'load_by_gradual_id'
+    batches_per_epoch: batches_per_epoch
+    batch_size: batch_size
+    keep_source: False
+
+
+
+
+
+
+
+
+
+

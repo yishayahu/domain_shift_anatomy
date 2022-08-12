@@ -156,7 +156,7 @@ def run_cross_validation(experiments, combs,data_split_path,res_path,metric,targ
         if running_now:
             time.sleep(600)
     print(stats)
-    json.dump(stats,open(f'all_stats_{bs}.json','w'))
+    json.dump(stats,open(f'all_stats_{bs}_{momentum}.json','w'))
     return stats
 
 def main():
@@ -189,23 +189,24 @@ def main():
         base_exps_adam = ['gradual_tl_not_keep_source_adam']
         experiments_base = base_exps_sgd+base_exps_adam
         experiments =  experiments_base
+        only_stats = False
         for bs in [2,4,8,16,32]:
             cur_res_path  = Path(str(res_path)+ f'_bs_{bs}')
             if not cur_res_path.exists():
                 cur_res_path.mkdir()
-            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],bs=bs)
+            run_cross_validation(only_stats=only_stats,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],bs=bs)
         experiments = ['posttrain_continue_optimizer']
         for momentum in [0.1,0.4,0.8,0.9,0.99]:
             cur_res_path  = Path(str(res_path)+ f'_momentum_{momentum}')
             if not cur_res_path.exists():
                 cur_res_path.mkdir()
-            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],momentum=momentum)
+            run_cross_validation(only_stats=only_stats,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],momentum=momentum)
         experiments = ['posttrain_continue_optimizer_from_step_adam']
         for from_step in [100,500,2000,3000]:
             cur_res_path  = Path(str(res_path)+ f'_from_step_{from_step}')
             if not cur_res_path.exists():
                 cur_res_path.mkdir()
-            run_cross_validation(only_stats=False,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],from_step=from_step)
+            run_cross_validation(only_stats=only_stats,experiments=experiments,combs=combs,metric=metric,data_split_path=data_split_path,res_path=cur_res_path,target_sizes=[0,1,2,4],from_step=from_step)
 
 
 

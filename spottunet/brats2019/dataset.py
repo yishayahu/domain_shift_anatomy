@@ -58,19 +58,24 @@ class brain3DDataset(BaseDataset):
     def __getitem__(self, index,only_seg=False,is_train=False):
         x= None
         item_path = BRATS_DATA_PATH/self.A_paths[index]
+        t1_path = self.glob_path(item_path,'*t1.nii')
         t2_path = self.glob_path(item_path,'*t2.nii')
         flair_path = self.glob_path(item_path,'*flair.nii')
         seg_path = self.glob_path(item_path,'*seg.nii')
         if not only_seg:
 
+            # t1_img = nib.load(t1_path)
             t2_img = nib.load(t2_path)
             flair_img = nib.load(flair_path)
+            # t1_img = self.transform(t1_img)
             t2_img = self.transform(t2_img)
             flair_img = self.transform(flair_img)
+
             if is_train:
                 pass
                 # t2_img = self.train_transform(t2_img)
                 # flair_img = self.train_transform(flair_img)
+                # t1_img = self.colorJitter(t1_img)
                 # t2_img = self.colorJitter(t2_img)
                 # flair_img = self.colorJitter(flair_img, no_update=True)
             x = torch.concat((t2_img, flair_img), dim=0)
