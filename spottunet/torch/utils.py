@@ -4,6 +4,7 @@ import os
 from copy import deepcopy
 
 import numpy as np
+import pandas as pd
 import torch
 from dpipe.batch_iter import sample
 
@@ -104,6 +105,36 @@ def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[floa
             for _ in range(from_source):
                 yield squeeze_first(tuple(pam(loaders, next(source_iter))))
         epoch+=1
+
+
+def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
+                                  random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2,keep_source=True,csv_path=None):
+    source_ids = ids[:-ts_size]
+    target_ids = ids[-ts_size:]
+    target_iter = sample(target_ids, weights, random_state)
+    df = pd.read_csv(csv_path)
+    df = df[df['label'] == 0]
+    df["id"] = df['id'].apply(lambda row: 'CC'+ str(row).zfill(4))
+    df = df[df['id'].apply(lambda row: str(row) in source_ids)]
+    amount_to_remove_every_epoch = df.shape[0] // 64
+    epoch = 0
+    while True:
+
+        for _ in range(batches_per_epoch):
+            if keep_source:
+                from_target = min((epoch//4)+ 1,batch_size-1)
+            else:
+                from_target = min((epoch//4)+ 1,batch_size)
+            from_source = batch_size - from_target
+            for _ in range(from_target):
+                yield squeeze_first(tuple(pam(loaders, next(target_iter))))
+            for _ in range(from_source):
+                df_loc = np.random.randint(df.shape[0])
+                id1,slc = df.iloc[df_loc]['id'],int(df.iloc[df_loc]['slice_num'])
+                yield squeeze_first(tuple(pam(loaders, (id1, slc))))
+        epoch+=1
+        df = df.iloc[amount_to_remove_every_epoch:]
+
 
 def load_half_from_test(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
                         random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2):

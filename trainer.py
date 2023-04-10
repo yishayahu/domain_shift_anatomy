@@ -40,7 +40,7 @@ from dpipe.dataset.wrappers import apply, cache_methods
 from spottunet.dataset.cc359 import Rescale3D, CC359, scale_mri, CC359Ds
 from spottunet.paths import *
 from dpipe.im.metrics import dice_score
-from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch
+from spottunet.batch_iter import slicewise, SPATIAL_DIMS, get_random_slice, sample_center_uniformly, extract_patch,get_curriculum_slice
 from dpipe.predict import add_extract_dims, divisible_shape
 from spottunet.torch.module.unet import UNet2D
 from dpipe.train.policy import Schedule, TQDM
@@ -48,7 +48,7 @@ from dpipe.torch.functional import weighted_cross_entropy_with_logits
 from dpipe.batch_iter import Infinite, load_by_random_id, unpack_args, multiply
 from dpipe.im.shape_utils import prepend_dims
 from spottunet.torch.utils import load_model_state_fold_wise, freeze_model, none_func, empty_dict_func, \
-    load_by_gradual_id, freeze_model_spottune, modify_state_fn_spottune
+    load_by_gradual_id, freeze_model_spottune, modify_state_fn_spottune, curriculum_load_by_gradual_id
 
 
 class Config:
@@ -263,6 +263,7 @@ if __name__ == '__main__':
             reference_architecture = UNet2D(n_chans_in=n_chans_in, n_chans_out=1, n_filters_init=16)
             reference_architecture= reference_architecture.to(device)
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
+    csv_path = f"/home/dsi/shaya/tomer/AIVA/dataset/clustering_finetune/{opts.source}_{opts.target}.csv"
     cfg.second_round()
 
 
@@ -369,14 +370,14 @@ if __name__ == '__main__':
     ids_sampling_weights = None
 
 
-
+    get_slice_func = getattr(cfg, "SLICE_FUNC", get_random_slice)
 
     x_patch_size = y_patch_size = np.array([256, 256])
     if msm:
         batch_iter = Infinite(
             sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
                         weights=ids_sampling_weights, random_state=seed),
-            unpack_args(get_random_slice, interval=slice_sampling_interval,msm=True),
+            unpack_args(get_slice_func, interval=slice_sampling_interval,msm=True),
             multiply(np.float32),
             batch_size=batch_size, batches_per_epoch=batches_per_epoch
         )
@@ -388,15 +389,26 @@ if __name__ == '__main__':
             batch_size=batch_size, batches_per_epoch=batches_per_epoch
         )
     else:
-        batch_iter = Infinite(
-            sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
-                              weights=ids_sampling_weights, random_state=seed),
-            unpack_args(get_random_slice, interval=slice_sampling_interval),
-            unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
-            multiply(prepend_dims),
-            multiply(np.float32),
-            batch_size=batch_size, batches_per_epoch=batches_per_epoch
-        )
+        if getattr(cfg,"CURRICULUM",False):
+            batch_iter = Infinite(
+                sample_func(dataset.load_image_slice, dataset.load_segm_slice, ids=train_ids,
+                            weights=ids_sampling_weights, random_state=seed),
+                unpack_args(get_slice_func, interval=slice_sampling_interval),
+                unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
+                multiply(prepend_dims),
+                multiply(np.float32),
+                batch_size=batch_size, batches_per_epoch=batches_per_epoch
+            )
+        else:
+            batch_iter = Infinite(
+                sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
+                                  weights=ids_sampling_weights, random_state=seed),
+                unpack_args(get_slice_func, interval=slice_sampling_interval),
+                unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
+                multiply(prepend_dims),
+                multiply(np.float32),
+                batch_size=batch_size, batches_per_epoch=batches_per_epoch
+            )
     train_model = partial(train,
         train_step=train_step_func,
         batch_iter=batch_iter,

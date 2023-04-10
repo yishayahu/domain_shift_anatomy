@@ -22,6 +22,12 @@ def get_random_slice(*arrays, interval: int = 1,msm=False):
         return tuple(array[..., slc] for array in arrays)
 
 
+def get_curriculum_slice(*arrays, interval: int = 1,msm=False):
+    if len(arrays[0].shape) == 3:
+        slc = np.random.randint(arrays[0].shape[-1] // interval) * interval
+        return tuple(array[..., slc] for array in arrays)
+    return tuple(array for array in arrays)
+
 def sample_center_uniformly(shape, patch_size, spatial_dims):
     spatial_shape = np.array(shape)[list(spatial_dims)]
     if np.all(patch_size <= spatial_shape):

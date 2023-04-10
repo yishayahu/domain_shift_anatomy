@@ -27,6 +27,18 @@ class CC359(SegmentationFromCSV):
     def load_segm(self, i):
         return np.float32(super().load_segm(i))  # already 3D
 
+    def load_image_slice(self, i):
+        if isinstance(i,tuple):
+            id1,slc = i
+            return np.float32(super().load_image(id1)[0][..., slc])  # 4D -> 3D
+        else:
+            return np.float32(super().load_image(i)[0])  # 4D -> 3D
+    def load_segm_slice(self, i):
+        if isinstance(i, tuple):
+            id1,slc = i
+            return np.float32(super().load_segm(id1)[..., slc])  # 4D -> 3D
+        else:
+            return np.float32(super().load_segm(i))  # 4D -> 3D
     def load_shape(self, i):
         return np.int32(np.shape(self.load_segm(i)))
 
