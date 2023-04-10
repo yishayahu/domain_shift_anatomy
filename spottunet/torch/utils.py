@@ -116,6 +116,7 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
     df = df[df['label'] == 0]
     df["id"] = df['id'].apply(lambda row: 'CC'+ str(row).zfill(4))
     df = df[df['id'].apply(lambda row: str(row) in source_ids)]
+    df = df[df['slice_num'] < 256]
     amount_to_remove_every_epoch = df.shape[0] // 64
     epoch = 0
     while True:
