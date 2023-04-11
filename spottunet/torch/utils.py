@@ -119,6 +119,7 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
     df = df[df['id'].apply(lambda row: str(row) in source_ids)]
     df = df[df['slice_num'] < 256]
     amount_to_remove_every_epoch = df.shape[0] // 64
+    cur_start_index = 0
     epoch = 0
     while True:
         gc.collect()
@@ -131,11 +132,12 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
             for _ in range(from_target):
                 yield squeeze_first(tuple(pam(loaders, next(target_iter))))
             for _ in range(from_source):
-                df_loc = np.random.randint(df.shape[0])
-                id1,slc = df.iloc[df_loc]['id'],int(df.iloc[df_loc]['slice_num'])
+                df_loc = np.random.randint(cur_start_index, df.shape[0])
+                row = df.iloc[df_loc]
+                id1,slc = row['id'],int(row['slice_num'])
                 yield squeeze_first(tuple(pam(loaders, (id1, slc))))
         epoch+=1
-        df = df.iloc[amount_to_remove_every_epoch:]
+        cur_start_index += amount_to_remove_every_epoch
 
 
 

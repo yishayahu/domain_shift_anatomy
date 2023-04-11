@@ -188,7 +188,8 @@ if __name__ == '__main__':
         if len(val_ids) > 2:
             val_ids = val_ids[-2:]
     else:
-        lock_dir(exp_dir)
+        pass
+        # lock_dir(exp_dir)
 
     print(f'running on bs {batch_size}')
     print(f'running {opts.exp_name}')
