@@ -268,7 +268,7 @@ if __name__ == '__main__':
     ckpt_dir = Path(exp_dir) / 'checkpoints'
     if ckpt_dir.exists():
         start_epoch=0
-        for ckpt in ckpt_dir.glob('checkpoint_'):
+        for ckpt in ckpt_dir.glob('checkpoint_*'):
             if 'best' in ckpt.name:
                 continue
             start_epoch = int(ckpt.name.split('_')[-1])
