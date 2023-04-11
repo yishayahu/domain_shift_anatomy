@@ -11,5 +11,6 @@ SECOND_ROUND:
     batch_size: batch_size
     keep_source: False
     csv_path: csv_path
+    start_epoch: start_epoch
   SLICE_FUNC:
     FUNC: 'get_curriculum_slice'

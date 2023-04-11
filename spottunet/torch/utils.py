@@ -109,7 +109,8 @@ def load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[floa
 
 
 def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
-                                  random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2,keep_source=True,csv_path=None):
+                                  random_state: Union[np.random.RandomState, int] = None,batches_per_epoch=100,batch_size=16,ts_size=2,keep_source=True,csv_path=None,start_epoch=None):
+    assert start_epoch is not None
     source_ids = ids[:-ts_size]
     target_ids = ids[-ts_size:]
     target_iter = sample(target_ids, weights, random_state)
@@ -119,8 +120,8 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
     df = df[df['id'].apply(lambda row: str(row) in source_ids)]
     df = df[df['slice_num'] < 256]
     amount_to_remove_every_epoch = df.shape[0] // 64
-    cur_start_index = 0
-    epoch = 0
+    cur_start_index = start_epoch * amount_to_remove_every_epoch
+    epoch = start_epoch
     while True:
         gc.collect()
         for _ in range(batches_per_epoch):
