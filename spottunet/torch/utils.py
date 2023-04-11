@@ -1,3 +1,4 @@
+import gc
 import random
 from typing import Sequence, Callable, Union
 import os
@@ -120,7 +121,7 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
     amount_to_remove_every_epoch = df.shape[0] // 64
     epoch = 0
     while True:
-
+        gc.collect()
         for _ in range(batches_per_epoch):
             if keep_source:
                 from_target = min((epoch//4)+ 1,batch_size-1)
@@ -135,6 +136,7 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
                 yield squeeze_first(tuple(pam(loaders, (id1, slc))))
         epoch+=1
         df = df.iloc[amount_to_remove_every_epoch:]
+
 
 
 def load_half_from_test(*loaders: Callable, ids: Sequence, weights: Sequence[float] = None,
