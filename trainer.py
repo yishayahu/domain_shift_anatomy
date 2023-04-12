@@ -266,8 +266,8 @@ if __name__ == '__main__':
         load_model_state_fold_wise(architecture=reference_architecture, baseline_exp_path=base_ckpt_path)
     csv_path = f"/home/dsi/shaya/tomer/AIVA/dataset/clustering_finetune/{opts.source}_{opts.target}.csv"
     ckpt_dir = Path(exp_dir) / 'checkpoints'
+    start_epoch=0
     if ckpt_dir.exists():
-        start_epoch=0
         for ckpt in ckpt_dir.glob('checkpoint_*'):
             if 'best' in ckpt.name:
                 continue

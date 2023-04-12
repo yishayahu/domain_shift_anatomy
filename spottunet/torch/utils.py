@@ -140,6 +140,8 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
                 yield squeeze_first(tuple(pam(loaders, (id1, slc))))
         epoch+=1
         cur_start_index += amount_to_remove_every_epoch
+        if cur_start_index > df.shape[0] * 0.6:
+            cur_start_index = int(df.shape[0] * 0.6)
 
 
 
