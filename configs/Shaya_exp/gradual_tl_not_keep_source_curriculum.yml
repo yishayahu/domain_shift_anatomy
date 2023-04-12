@@ -1,0 +1,14 @@
+FREEZE_FUNC: "none_func"
+CURRICULUM: True
+NUM_EPOCHS: 60
+ADD_SOURCE_IDS: True
+SECOND_ROUND:
+  SAMPLE_FUNC:
+    FUNC: 'curriculum_load_by_gradual_id'
+    batches_per_epoch: batches_per_epoch
+    batch_size: batch_size
+    keep_source: False
+    csv_path: csv_path
+    start_epoch: start_epoch
+  SLICE_FUNC:
+    FUNC: 'get_curriculum_slice'

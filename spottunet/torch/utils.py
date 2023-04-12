@@ -137,9 +137,9 @@ def curriculum_load_by_gradual_id(*loaders: Callable, ids: Sequence, weights: Se
             for _ in range(from_source):
                 df_loc = np.random.randint(cur_start_index, df.shape[0])
                 row = df.iloc[df_loc]
-                id1,slc = row['id'],int(row['slice_num'])
+                id1, slc = row['id'],int(row['slice_num'])
                 ret = squeeze_first(tuple(pam(loaders, id1)))
-                ret = (x[...,slc] for x in ret)
+                ret = (x[..., slc] for x in ret)
                 yield ret
         epoch+=1
         cur_start_index += amount_to_remove_every_epoch
