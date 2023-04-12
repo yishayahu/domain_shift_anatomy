@@ -172,7 +172,7 @@ if __name__ == '__main__':
     if opts.train_only_source:
         project = f'spot_s{opts.source}'
     else:
-        project = f'spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
+        project = f'last_spot_ts_{opts.ts_size}_s{opts.source}_t{opts.target}'
     if msm:
         project = 'msm'+ project[4:]
 
@@ -399,7 +399,7 @@ if __name__ == '__main__':
     else:
         if getattr(cfg,"CURRICULUM",False):
             batch_iter = Infinite(
-                sample_func(dataset.load_image_slice, dataset.load_segm_slice, ids=train_ids,
+                sample_func(dataset.load_image, dataset.load_segm, ids=train_ids,
                             weights=ids_sampling_weights, random_state=seed),
                 unpack_args(get_slice_func, interval=slice_sampling_interval),
                 unpack_args(get_random_patch_2d, x_patch_size=x_patch_size, y_patch_size=y_patch_size),
